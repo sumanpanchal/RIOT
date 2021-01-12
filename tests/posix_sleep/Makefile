@@ -1,12 +1,9 @@
-APPLICATION = posix_sleep
 include ../Makefile.tests_common
 
-BOARD_BLACKLIST := arduino-mega2560
-# arduino-mega2560: warning: iteration 2u invokes undefined behavior
-# [-Waggressive-loop-optimizations]
+USEMODULE += posix_sleep
 
-USEMODULE += posix
-
-DISABLE_MODULE += auto_init
+# Pull-in periph-rtt on board that provides this feature to switch to the RTT
+# backend of ztimer
+FEATURES_OPTIONAL += periph_rtt
 
 include $(RIOTBASE)/Makefile.include

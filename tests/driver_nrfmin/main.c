@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Freie Universität Berlin
+ * Copyright (C) 2019 Freie Universität Berlin
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -11,7 +11,7 @@
  * @{
  *
  * @file
- * @brief       Test application for the NRF51822 minimal radio driver (nrfmin)
+ * @brief       Test for the Nordic specific nrfmin radio driver
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  *
@@ -21,40 +21,23 @@
 #include <stdio.h>
 
 #include "shell.h"
-#include "posix_io.h"
-#include "board_uart0.h"
-#include "nrfmin.h"
-#include "net/ng_netbase.h"
-#include "net/ng_nomac.h"
-#include "net/ng_pktdump.h"
+#include "msg.h"
 
-#define SHELL_BUFSIZE       (UART0_BUFSIZE)
-
-static char nomac_stack[THREAD_STACKSIZE_DEFAULT];
+#define MAIN_QUEUE_SIZE     (8)
+static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int main(void)
 {
-    shell_t shell;
-    ng_netdev_t dev;
-    ng_netreg_entry_t netobj;
+    /* we need a message queue for the thread running the shell in order to
+     * receive potentially fast incoming networking packets */
+    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+    puts("Test for the RIOT integration of the nrfmin radio driver");
 
-    puts("\nManual test for the minimal NRF51822 radio driver\n");
-    puts("Use the 'ifconfig' and 'txtsnd' shell commands to verify the driver");
+    /* start shell */
+    puts("All up, running the shell now");
+    char line_buf[SHELL_DEFAULT_BUFSIZE];
+    shell_run(NULL, line_buf, SHELL_DEFAULT_BUFSIZE);
 
-    /* initialize network device */
-    nrfmin_init(&dev);
-    ng_nomac_init(nomac_stack, sizeof(nomac_stack), 5, "nomac", &dev);
-
-    /* initialize packet dumper */
-    netobj.pid = ng_pktdump_getpid();
-    netobj.demux_ctx = NG_NETREG_DEMUX_CTX_ALL;
-    ng_netreg_register(NG_NETTYPE_UNDEF, &netobj);
-
-    /* initialize and run the shell */
-    board_uart0_init();
-    posix_open(uart0_handler_pid, 0);
-    shell_init(&shell, NULL, SHELL_BUFSIZE, uart0_readc, uart0_putc);
-    shell_run(&shell);
-
+    /* should be never reached */
     return 0;
 }

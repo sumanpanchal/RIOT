@@ -25,9 +25,6 @@
 #include "cpu.h"
 #include "board.h"
 
-void uart_init(void);
-
-
 static void z1_ports_init(void)
 {
     /* Port 1:
@@ -144,14 +141,14 @@ void msp430_init_dco(void)
     }
 
     CCTL2 = CCIS0 + CM0 + CAP;            /* Define CCR2, CAP, ACLK */
-    TACTL = TASSEL1 + TACLR + MC1;        /* SMCLK, continous mode */
+    TACTL = TASSEL1 + TACLR + MC1;        /* SMCLK, continuous mode */
 
     while (1) {
         unsigned int compare;
 
-        while ((CCTL2 & CCIFG) != CCIFG);   /* Wait until capture occured!*/
+        while ((CCTL2 & CCIFG) != CCIFG);   /* Wait until capture occurred!*/
 
-        CCTL2 &= ~CCIFG;                    /* Capture occured, clear flag */
+        CCTL2 &= ~CCIFG;                    /* Capture occurred, clear flag */
         compare = CCR2;                     /* Get current captured SMCLK */
         compare = compare - oldcapture;     /* SMCLK difference */
         oldcapture = CCR2;                  /* Save current captured SMCLK */
@@ -190,8 +187,8 @@ void msp430_init_dco(void)
 #else
     /* default values for quick start-up */
     DCOCTL = 0x00;   /* avoid possible temporary overclocking... */
-    BCSCTL1 = 0x0d;
-    DCOCTL = 0x9a;
+    BCSCTL1 = 0x8d;  /* as seen in Contiki code */
+    DCOCTL = 0x88;   /* as seen in Contiki code */
 #endif
 
     /* Other clock configuration */
@@ -216,9 +213,6 @@ void board_init(void)
 
     /* initializes DCO */
     msp430_init_dco();
-
-    /* initialize UART/USB module */
-    uart_init();
 
     /* enable interrupts */
     __bis_SR_register(GIE);

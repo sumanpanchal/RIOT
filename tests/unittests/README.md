@@ -22,7 +22,14 @@ You then can run the tests by calling
 make term
 ```
 
-or flash them to your board as you would flash any RIOT application to the board (see [[board documentation|RIOT-Platforms]]).
+or flash them to your board as you would flash any RIOT application to the board (see [board documentation|RIOT-Platforms](https://github.com/RIOT-OS/RIOT/wiki/RIOT-Platforms)).
+
+You can debug your tests by running
+
+```bash
+make debug
+```
+and using GDB as usual.
 
 ### Other output formats
 Other output formats using [*embUnit*](http://embunit.sourceforge.net/)'s ``textui`` library are available by setting the environment variable ``OUTPUT``:
@@ -30,6 +37,8 @@ Other output formats using [*embUnit*](http://embunit.sourceforge.net/)'s ``text
 * Compiler: ``OUTPUT="COMPILER"``
 * Text: ``OUTPUT="TEXT"``
 * XML: ``OUTPUT="XML"``
+* Color: ``OUTPUT="COLOR"`` (like default, but with red/green output)
+* Colored-Text: ``OUTPUT="COLORTEXT"`` (like ``TEXT``, but with red/green output)
 
 #### Compile example
 ```bash
@@ -88,9 +97,9 @@ make term
 ```
 
 ## Writing unit tests
-### File struture
+### File structure
 RIOT uses [*embUnit*](http://embunit.sourceforge.net/) for unit testing.
-All unit tests are organized in ``tests/unittests`` and can be build module-wise, if needed.
+All unit tests are organized in ``tests/unittests`` and can be built module-wise, if needed.
 For each module there exists a ``tests-<modulename>/tests-<modulename>.h`` file, at least one C file in ``tests-<modulename>/`` and a ``tests-<modulename>/Makefile``.
 It is recommended to add a C file named ``tests-<modulename>/tests-<modulename>-<headername>.c`` for every header file that defines functions (or macros) implemented in the module.
 If there is only one such header file ``tests-<modulename>/tests-<modulename>.c`` should suffice.
@@ -140,8 +149,8 @@ The test header ``tests-<modulename>/tests-<module>.h`` of a module you add to `
  *
  * @author      <author>
  */
-#ifndef TESTS_<MODULE>_H_
-#define TESTS_<MODULE>_H_
+#ifndef TESTS_<MODULE>_H
+#define TESTS_<MODULE>_H
 #include "embUnit/embUnit.h"
 
 #ifdef __cplusplus
@@ -168,7 +177,7 @@ Test *tests_<module>_<header2>_tests(void);
 }
 #endif
 
-#endif /* TESTS_<MODULE>_H_ */
+#endif /* TESTS_<MODULE>_H */
 /** @} */
 ```
 
@@ -186,7 +195,7 @@ Every ``tests-<modulename>/tests-<module>*.c`` file you add to ``tests/unittests
 
 /* clib includes */
 
-#include "embUnit/embUnit.h"
+#include "embUnit.h"
 
 #include "<header>.h"
 
@@ -244,9 +253,7 @@ Test *tests_<module>_<header>_tests(void)
         /* ... */
     };
 
-    EMB_UNIT_TESTCALLER(<module>_<header>_tests, "<module>_<header>_tests",
-                        tests_<module>_<header>_set_up,
-                        tests_<module>_<header>_tear_down, fixtures);
+    EMB_UNIT_TESTCALLER(<module>_<header>_tests, set_up, tear_down, fixtures);
     /* set up and tear down function can be NULL if omitted */
 
     return (Test *)&<module>_<header>;

@@ -29,8 +29,6 @@
 #include <inttypes.h>
 
 #include "thread.h"
-#include "flags.h"
-#include "kernel.h"
 #include "pipe.h"
 #include "pipe.h"
 
@@ -49,11 +47,12 @@ static void *run_middle(void *arg)
 
     unsigned read_total = 0;
     while (read_total < BYTES_TOTAL) {
-        char buf[4];
-        unsigned read = pipe_read(&pipes[0], buf, sizeof (buf));
+        char buf[5];
+        unsigned read = pipe_read(&pipes[0], buf, sizeof(buf) - 1);
+        buf[read] = 0;
         unsigned read_start = read_total;
         read_total += read;
-        printf("Middle read: <%.*s> [%u:%u]\n", read, buf,
+        printf("Middle read: <%s> [%u:%u]\n", buf,
                read_start, read_total);
 
         unsigned written_total = 0;
@@ -74,11 +73,12 @@ static void *run_end(void *arg)
 
     unsigned read_total = 0;
     while (read_total < BYTES_TOTAL) {
-        char buf[3];
-        int read = pipe_read(&pipes[1], buf, sizeof (buf));
+        char buf[4];
+        int read = pipe_read(&pipes[1], buf, sizeof(buf) - 1);
+        buf[read] = 0;
         unsigned read_start = read_total;
         read_total += read;
-        printf("End read: <%.*s> [%u:%u]\n", read, buf,
+        printf("End read: <%s> [%u:%u]\n", buf,
                read_start, read_total);
     }
 
@@ -101,10 +101,12 @@ int main(void)
     }
 
     thread_create(stacks[0], sizeof (stacks[0]),
-                  THREAD_PRIORITY_MAIN, CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                  THREAD_PRIORITY_MAIN,
+                  THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
                   run_middle, NULL, "middle");
     thread_create(stacks[1], sizeof (stacks[1]),
-                  THREAD_PRIORITY_MAIN, CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                  THREAD_PRIORITY_MAIN,
+                  THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
                   run_end, NULL, "end");
 
     unsigned total = 0;

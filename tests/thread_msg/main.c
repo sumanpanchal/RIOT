@@ -28,7 +28,7 @@ char t1_stack[THREAD_STACKSIZE_MAIN];
 char t2_stack[THREAD_STACKSIZE_MAIN];
 char t3_stack[THREAD_STACKSIZE_MAIN];
 
-kernel_pid_t p1, p2, p3;
+kernel_pid_t p_main, p1, p2, p3;
 
 void *thread1(void *arg)
 {
@@ -47,13 +47,15 @@ void *thread1(void *arg)
     }
 
     puts("THREAD 1 end\n");
+    msg_t msg;
+    msg_send(&msg, p_main);
     return NULL;
 }
 
 void *thread2(void *arg)
 {
     (void) arg;
-    puts("THREAD 2\n");
+    puts("THREAD 2 start\n");
 
     for (int i = 0;; ++i) {
         msg_t msg, reply;
@@ -70,7 +72,7 @@ void *thread2(void *arg)
 void *thread3(void *arg)
 {
     (void) arg;
-    puts("THREAD 3\n");
+    puts("THREAD 3 start\n");
 
     for (int i = 0;; ++i) {
         msg_t msg;
@@ -83,15 +85,23 @@ void *thread3(void *arg)
 
 int main(void)
 {
+    p_main = thread_getpid();
     p1 = thread_create(t1_stack, sizeof(t1_stack), THREAD_PRIORITY_MAIN - 1,
-                       CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                       THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
                        thread1, NULL, "nr1");
     p2 = thread_create(t2_stack, sizeof(t2_stack), THREAD_PRIORITY_MAIN - 1,
-                       CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                       THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
                        thread2, NULL, "nr2");
     p3 = thread_create(t3_stack, sizeof(t3_stack), THREAD_PRIORITY_MAIN - 1,
-                       CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                       THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
                        thread3, NULL, "nr3");
     puts("THREADS CREATED\n");
+
+    msg_t msg;
+    /* Wait until thread 1 is done */
+    msg_receive(&msg);
+
+    puts("SUCCESS");
+
     return 0;
 }

@@ -9,7 +9,9 @@
 #include "map.h"
 
 #include "embUnit.h"
-#include "lpm.h"
+#include "xtimer.h"
+
+#include "test_utils/interactive_sync.h"
 
 #define UNCURRY(FUN, ARGS) FUN(ARGS)
 #define RUN_TEST_SUITES(...) MAP(RUN_TEST_SUITE, __VA_ARGS__)
@@ -21,6 +23,13 @@
 
 int main(void)
 {
+    test_utils_interactive_sync();
+
+#ifdef MODULE_XTIMER
+    /* auto_init is disabled, but some modules depends on this module being initialized */
+    xtimer_init();
+#endif
+
 #ifdef OUTPUT
     TextUIRunner_setOutputter(OUTPUTTER);
 #endif
@@ -31,6 +40,5 @@ int main(void)
 #endif
     TESTS_END();
 
-    lpm_set(LPM_POWERDOWN);
     return 0;
 }

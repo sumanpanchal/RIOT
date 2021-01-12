@@ -7,9 +7,63 @@
  */
 
 /**
- * @defgroup    driver_periph_gpio GPIO
- * @ingroup     driver_periph
+ * @defgroup    drivers_periph_gpio GPIO
+ * @ingroup     drivers_periph
  * @brief       Low-level GPIO peripheral driver
+ *
+ * This is a basic GPIO (General-purpose input/output) interface to allow
+ * platform independent access to a MCU's input/output pins. This interface is
+ * intentionally designed to be as simple as possible, to allow for easy
+ * implementation and maximum portability.
+ *
+ * The interface provides capabilities to initialize a pin as output-,
+ * input- and interrupt pin. With the API you can basically set/clear/toggle the
+ * digital signal at the hardware pin when in output mode. Configured as input you can
+ * read a digital value that is being applied to the pin externally. When initializing
+ * an external interrupt pin, you can register a callback function that is executed
+ * in interrupt context once the interrupt condition applies to the pin. Usually you
+ * can react to rising or falling signal flanks (or both).
+ *
+ * In addition the API provides to set standard input/output circuit modes such as
+ * e.g. internal push-pull configurations.
+ *
+ * All modern micro controllers organize their GPIOs in some form of ports,
+ * often named 'PA', 'PB', 'PC'..., or 'P0', 'P1', 'P2'..., or similar. Each of
+ * these ports is then assigned a number of pins, often 8, 16, or 32. A hardware
+ * pin can thus be described by its port/pin tuple. To access a pin, the
+ * @p GPIO_PIN(port, pin) macro should be used. For example: If your platform has
+ * a pin PB22, it will be port=1 and pin=22. The @p GPIO_PIN macro should be
+ * overridden by a MCU, to allow for efficient encoding of the the port/pin tuple.
+ * For example, on many platforms it is possible to `OR` the pin number with the
+ * corresponding ports base register address. This allows for efficient decoding
+ * of pin number and base address without the need of any address lookup.
+ *
+ * In case the driver does not define it, the below macro definition is used to
+ * simply map the port/pin tuple to the pin value. In that case, predefined GPIO
+ * definitions in `RIOT/boards/ * /include/periph_conf.h` will define the selected
+ * GPIO pin.
+ *
+ * @warning The scalar GPIO pin type `gpio_t` is deprecated and will be
+ * replaced by a structured GPIO pin type in a future GPIO API. Therefore,
+ * don't use the direct comparison of GPIO pins anymore. Instead, use the
+ * inline comparison functions @ref gpio_is_equal and @ref gpio_is_valid.
+ *
+ * # (Low-) Power Implications
+ *
+ * On almost all platforms, we can only control the peripheral power state of
+ * full ports (i.e. groups of pins), but not for single GPIO pins. Together with
+ * CPU specific alternate function handling for pins used by other peripheral
+ * drivers, this can make it quite complex to keep track of pins that are
+ * currently used at a certain moment. To simplify the implementations (and ease
+ * the memory consumption), we expect ports to be powered on (e.g. through
+ * peripheral clock gating) when first used and never be powered off again.
+ *
+ * GPIO driver implementations **should** power on the corresponding port during
+ * gpio_init() and gpio_init_int().
+ *
+ * For external interrupts to work, some platforms may need to block certain
+ * power modes (although this is not very likely). This should be done during
+ * gpio_init_int().
  *
  * @{
  * @file
@@ -18,55 +72,59 @@
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef GPIO_H
-#define GPIO_H
+#ifndef PERIPH_GPIO_H
+#define PERIPH_GPIO_H
+
+#include <limits.h>
 
 #include "periph_cpu.h"
+#include "periph_conf.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/**
- * @brief   Default GPIO macro maps port-pin tuples to the pin value
- */
-#ifndef GPIO
-#define GPIO(x,y)       ((x & 0) | y)
-#endif
-
-/**
- * @brief   Define global value for GPIO not defined
- */
-#ifndef GPIO_UNDEF
-#define GPIO_UNDEF      (-1)
-#endif
-
-/**
- * @brief   Define the default GPIO type identifier
- */
 #ifndef HAVE_GPIO_T
-typedef int gpio_t;
+/**
+ * @brief   GPIO type identifier
+ */
+typedef unsigned int gpio_t;
+#endif
+
+#ifndef GPIO_PIN
+/**
+ * @brief   Convert (port, pin) tuple to @c gpio_t value
+ */
+/* Default GPIO macro maps port-pin tuples to the pin value */
+#define GPIO_PIN(x,y)       ((gpio_t)((x & 0) | y))
+#endif
+
+#ifndef GPIO_UNDEF
+/**
+ * @brief   GPIO pin not defined
+ */
+#define GPIO_UNDEF          ((gpio_t)(UINT_MAX))
 #endif
 
 /**
- * @brief   Definition of available pin directions
+ * @brief   Available pin modes
+ *
+ * Generally, a pin can be configured to be input or output. In output mode, a
+ * pin can further be put into push-pull or open drain configuration. Though
+ * this is supported by most platforms, this is not always the case, so driver
+ * implementations may return an error code if a mode is not supported.
  */
-#ifndef HAVE_GPIO_DIR_T
+#ifndef HAVE_GPIO_MODE_T
 typedef enum {
-    GPIO_DIR_IN = 0,        /**< configure pin as input */
-    GPIO_DIR_OUT = 1,       /**< configure pin as output */
-} gpio_dir_t;
-#endif
-
-/**
- * @brief   Definition of pull-up/pull-down modes
- */
-#ifndef HAVE_GPIO_PP_T
-typedef enum {
-    GPIO_NOPULL = 0,        /**< do not use internal pull resistors */
-    GPIO_PULLUP = 1,        /**< enable internal pull-up resistor */
-    GPIO_PULLDOWN = 2       /**< enable internal pull-down resistor */
-} gpio_pp_t;
+    GPIO_IN ,               /**< configure as input without pull resistor */
+    GPIO_IN_PD,             /**< configure as input with pull-down resistor */
+    GPIO_IN_PU,             /**< configure as input with pull-up resistor */
+    GPIO_OUT,               /**< configure as output in push-pull mode */
+    GPIO_OD,                /**< configure as output in open-drain mode without
+                             *   pull resistor */
+    GPIO_OD_PU              /**< configure as output in open-drain mode with
+                             *   pull resistor enabled */
+} gpio_mode_t;
 #endif
 
 /**
@@ -88,17 +146,31 @@ typedef enum {
 typedef void (*gpio_cb_t)(void *arg);
 
 /**
+ * @brief   Default interrupt context for GPIO pins
+ */
+#ifndef HAVE_GPIO_ISR_CTX_T
+typedef struct {
+    gpio_cb_t cb;           /**< interrupt callback */
+    void *arg;              /**< optional argument */
+} gpio_isr_ctx_t;
+#endif
+
+/**
  * @brief   Initialize the given pin as general purpose input or output
  *
+ * When configured as output, the pin state after initialization is undefined.
+ * The output pin's state **should** be untouched during the initialization.
+ * This behavior can however **not be guaranteed** by every platform.
+ *
  * @param[in] pin       pin to initialize
- * @param[in] dir       direction for the pin, input or output
- * @param[in] pullup    define what pull resistors should be used
+ * @param[in] mode      mode of the pin, see @c gpio_mode_t
  *
  * @return              0 on success
  * @return              -1 on error
  */
-int gpio_init(gpio_t pin, gpio_dir_t dir, gpio_pp_t pullup);
+int gpio_init(gpio_t pin, gpio_mode_t mode);
 
+#if defined(MODULE_PERIPH_GPIO_IRQ) || defined(DOXYGEN)
 /**
  * @brief   Initialize a GPIO pin for external interrupt usage
  *
@@ -107,8 +179,11 @@ int gpio_init(gpio_t pin, gpio_dir_t dir, gpio_pp_t pullup);
  *
  * The interrupt is activated automatically after the initialization.
  *
+ * @note    You have to add the module `periph_gpio_irq` to your project to
+ *          enable this function
+ *
  * @param[in] pin       pin to initialize
- * @param[in] pullup    define what pull resistors should be enabled
+ * @param[in] mode      mode of the pin, see @c gpio_mode_t
  * @param[in] flank     define the active flank(s)
  * @param[in] cb        callback that is called from interrupt context
  * @param[in] arg       optional argument passed to the callback
@@ -116,31 +191,41 @@ int gpio_init(gpio_t pin, gpio_dir_t dir, gpio_pp_t pullup);
  * @return              0 on success
  * @return              -1 on error
  */
-int gpio_init_int(gpio_t pin, gpio_pp_t pullup, gpio_flank_t flank,
-                    gpio_cb_t cb, void *arg);
+int gpio_init_int(gpio_t pin, gpio_mode_t mode, gpio_flank_t flank,
+                  gpio_cb_t cb, void *arg);
 
 /**
- * @brief   Enable pin's interrupt if configured as interrupt source
+ * @brief   Enable pin interrupt if configured as interrupt source
+ *
+ *          Interrupts that would have occurred after @see gpio_irq_disable
+ *          was called will be discarded.
+ *
+ * @note    You have to add the module `periph_gpio_irq` to your project to
+ *          enable this function
  *
  * @param[in] pin       the pin to enable the interrupt for
  */
 void gpio_irq_enable(gpio_t pin);
 
 /**
- * @brief   Disable the pin's interrupt if configured as interrupt source
+ * @brief   Disable the pin interrupt if configured as interrupt source
+ *
+ * @note    You have to add the module `periph_gpio_irq` to your project to
+ *          enable this function
  *
  * @param[in] pin       the pin to disable the interrupt for
  */
 void gpio_irq_disable(gpio_t pin);
 
+#endif /* defined(MODULE_PERIPH_GPIO_IRQ) || defined(DOXYGEN) */
+
 /**
  * @brief   Get the current value of the given pin
  *
  * @param[in] pin       the pin to read
- * @return              the current value, 0 for LOW, != 0 for HIGH
  *
  * @return              0 when pin is LOW
- * @return              greater 0 for HIGH
+ * @return              >0 for HIGH
  */
 int gpio_read(gpio_t pin);
 
@@ -173,9 +258,30 @@ void gpio_toggle(gpio_t pin);
  */
 void gpio_write(gpio_t pin, int value);
 
+/**
+ * @brief   Test if a GPIO pin is equal to another GPIO pin
+ *
+ * @param[in] gpio1 First GPIO pin to check
+ * @param[in] gpio2 Second GPIO pin to check
+ */
+static inline int gpio_is_equal(gpio_t gpio1, gpio_t gpio2)
+{
+    return (gpio1 == gpio2);
+}
+
+/**
+ * @brief   Test if a GPIO pin is a valid pin and not declared as undefined.
+ *
+ * @param[in] gpio GPIO pin to check
+ */
+static inline int gpio_is_valid(gpio_t gpio)
+{
+    return (gpio != GPIO_UNDEF);
+}
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* GPIO_H */
+#endif /* PERIPH_GPIO_H */
 /** @} */

@@ -35,12 +35,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "posix_io.h"
-#include "board_uart0.h"
 #include "shell.h"
 #include "pcd8544.h"
-
-#define SHELL_BUFSIZE           (64U)
 
 static pcd8544_t dev;
 
@@ -52,7 +48,7 @@ static int _contrast(int argc, char **argv)
         printf("usage: %s VAL [0-127]\n", argv[0]);
         return 1;
     }
-    val = (uint8_t)atoi(argv[1]);
+    val = atoi(argv[1]);
     pcd8544_set_contrast(&dev, val);
     return 0;
 }
@@ -65,7 +61,7 @@ static int _temp(int argc, char **argv)
         printf("usage: %s VAL [0-3]\n", argv[0]);
         return 1;
     }
-    val = (uint8_t)atoi(argv[1]);
+    val = atoi(argv[1]);
     pcd8544_set_tempcoef(&dev, val);
     return 0;
 }
@@ -78,7 +74,7 @@ static int _bias(int argc, char **argv)
         printf("usage: %s VAL [0-7]\n", argv[0]);
         return 1;
     }
-    val = (uint8_t)atoi(argv[1]);
+    val = atoi(argv[1]);
     pcd8544_set_bias(&dev, val);
     return 0;
 }
@@ -136,8 +132,8 @@ static int _write(int argc, char **argv)
         return -1;
     }
 
-    x = (uint8_t)atoi(argv[1]);
-    y = (uint8_t)atoi(argv[2]);
+    x = atoi(argv[1]);
+    y = atoi(argv[2]);
 
     pcd8544_write_s(&dev, x, y, argv[3]);
     return 0;
@@ -158,8 +154,6 @@ static const shell_command_t shell_commands[] = {
 
 int main(void)
 {
-    shell_t shell;
-
     puts("PCD8544 LCD display test application\n");
     printf("Initializing PCD8544 LCD at SPI_%i... ", TEST_PCD8544_SPI);
     if (pcd8544_init(&dev, TEST_PCD8544_SPI, TEST_PCD8544_CS,
@@ -170,9 +164,9 @@ int main(void)
 
     /* run shell */
     puts("All OK, running shell now");
-    (void) posix_open(uart0_handler_pid, 0);
-    shell_init(&shell, shell_commands, SHELL_BUFSIZE, uart0_readc, uart0_putc);
-    shell_run(&shell);
+
+    char line_buf[SHELL_DEFAULT_BUFSIZE];
+    shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
     return 0;
 }

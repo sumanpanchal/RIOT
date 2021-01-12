@@ -17,20 +17,71 @@
  * @brief       Shell interface definition
  */
 
-#ifndef __SHELL_H
-#define __SHELL_H
+#ifndef SHELL_H
+#define SHELL_H
 
 #include <stdint.h>
+#include "periph/pm.h"
 
-#include "attributes.h"
+#include "kernel_defines.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
+ * @brief Shutdown RIOT on shell exit
+ */
+#ifndef CONFIG_SHELL_SHUTDOWN_ON_EXIT
+/* Some systems (e.g Ubuntu 20.04) close stdin on CTRL-D / EOF
+ * That means we can't just re-start the shell.
+ * Instead terminate RIOT, which is also the behavior a user would
+ * expect from a CLI application.
+ */
+#  ifdef CPU_NATIVE
+#    define CONFIG_SHELL_SHUTDOWN_ON_EXIT 1
+#  endif
+#endif
+
+/**
+ * @brief Default shell buffer size (maximum line length shell can handle)
+ */
+#define SHELL_DEFAULT_BUFSIZE   (128)
+
+/**
+ * @brief           Optional hook after readline has triggered.
+ * @details         User implemented function gets called after the shell
+ *                  readline is complete.
+ * @note            Only executed with the `shell_hooks` module.
+ */
+void shell_post_readline_hook(void);
+
+/**
+ * @brief           Optional hook before shell command is called.
+ * @details         User implemented function gets called before a valid shell
+ *                  command will be called.
+ * @note            Only executed with the `shell_hooks` module.
+ *
+ * @param[in]       argc   Number of arguments supplied to the function invocation.
+ * @param[in]       argv   The supplied argument list.
+ */
+void shell_pre_command_hook(int argc, char **argv);
+
+/**
+ * @brief           Optional hook after shell command is called.
+ * @details         User implemented function gets called before a valid shell
+ *                  command will be called.
+ * @note            Only executed with the `shell_hooks` module.
+ *
+ * @param[in]       ret    Return value of the shell command.
+ * @param[in]       argc   Number of arguments supplied to the function invocation.
+ * @param[in]       argv   The supplied argument list.
+ */
+void shell_post_command_hook(int ret, int argc, char **argv);
+
+/**
  * @brief           Protype of a shell callback handler.
- * @details         The functions supplied to shell_init() must use this signature.
+ * @details         The functions supplied to shell_run() must use this signature.
  *                  The argument list is terminated with a NULL, i.e ``argv[argc] == NULL`.
  *                  ``argv[0]`` is the function name.
  *
@@ -59,46 +110,52 @@ typedef struct shell_command_t {
 } shell_command_t;
 
 /**
- * @brief           The internal state of a shell session.
- * @details         Use shell_init() to initialize the datum,
- *                  and shell_run() to run the REPL session.
+ * @brief           Start a shell and exit once EOF is reached.
+ *
+ * @param[in]       commands    ptr to array of command structs
+ * @param[in]       line_buf    Buffer that will be used for reading a line
+ * @param[in]       len         nr of bytes that fit in line_buf
  */
-typedef struct shell_t {
-    const shell_command_t *command_list; /**< The commandlist supplied to shell_init(). */
-    uint16_t shell_buffer_size;          /**< The maximum line length supplied to shell_init(). */
-    int (*readchar)(void);               /**< The read function supplied to shell_init(). */
-    int (*put_char)(int);                /**< The write function supplied to shell_init(). */
-} shell_t;
+void shell_run_once(const shell_command_t *commands, char *line_buf, int len);
 
 /**
- * @brief           Initialize a shell session state.
- * @param[out]      shell               The datum to initialize.
- * @param[in]       shell_commands      Null-terminated list of commands to understand.
- *                                      Supply `NULL` to only feature the default commands.
- * @param           shell_buffer_size   The backing buffer for the command line.
- *                                      Allocated on the stack!
- * @param           read_char           A blocking function that reads one 8-bit character at a time.
- *                                      The valid code range is [0;255].
- *                                      A value of `< 0` denotes a read error.
- * @param           put_char            Function used to print back the last read character.
- *                                      Only valid unsigned chars in [0;255] will be supplied.
+ * @brief           Start a shell and restart it if it exits
+ *
+ *                  If `CONFIG_SHELL_SHUTDOWN_ON_EXIT` is set (e.g. on native)
+ *                  the shell will instead shut down RIOT once EOF is reached.
+ *
+ * @param[in]       commands    ptr to array of command structs
+ * @param[in]       line_buf    Buffer that will be used for reading a line
+ * @param[in]       len         nr of bytes that fit in line_buf
  */
-void shell_init(shell_t *shell,
-                const shell_command_t *shell_commands,
-                uint16_t shell_buffer_size,
-                int (*read_char)(void),
-                int (*put_char)(int));
+static inline void shell_run_forever(const shell_command_t *commands,
+                                     char *line_buf, int len)
+{
+    while (1) {
+        shell_run_once(commands, line_buf, len);
+
+        if (IS_ACTIVE(CONFIG_SHELL_SHUTDOWN_ON_EXIT)) {
+            pm_off();
+        }
+    }
+}
 
 /**
- * @brief           Start the shell session.
- * @param[in]       shell   The session that was previously initialized with shell_init().
- * @returns         This function does not return.
+ * @brief           Back-porting alias for @ref shell_run_forever
+ *
+ * @param[in]       commands    ptr to array of command structs
+ * @param[in]       line_buf    Buffer that will be used for reading a line
+ * @param[in]       len         nr of bytes that fit in line_buf
  */
-void shell_run(shell_t *shell) NORETURN;
+static inline void shell_run(const shell_command_t *commands,
+                             char *line_buf, int len)
+{
+    shell_run_forever(commands, line_buf, len);
+}
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __SHELL_H */
+#endif /* SHELL_H */
 /** @} */

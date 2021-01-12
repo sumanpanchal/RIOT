@@ -25,9 +25,9 @@ static void telosb_ports_init(void)
     P2DIR = 0xFF;    /* Port2 Direction: 11111111 = 0xFF */
 
     /* Port 3: UART and SPI */
-    P3SEL = 0xCE;    /* Port3 Select: 11001110 = 0xCE */
+    P3SEL = 0x0E;    /* Port3 Select: 11001110 = 0xCE */
     P3OUT = 0x00;    /* Port3 Output: 00000000 = 0x00 */
-    P3DIR = 0x4E;    /* Port3 Direction: 01001110 = 0x4E */
+    P3DIR = 0xFE;    /* Port3 Direction: 01001110 = 0x4E */
 
     /* Port 4: CS */
     P4SEL = 0x02;    /* Port4 Select: 00000010 = 0x02 */
@@ -66,18 +66,18 @@ void msp430_init_dco(void)
     BCSCTL1 |= DIVA1 + DIVA0;             /* ACLK = LFXT1CLK/8 */
 
     for (i = 0xFFFF; i > 0; i--) {        /* Delay for XTAL to settle */
-        asm("nop");
+        __asm__("nop");
     }
 
     CCTL2 = CCIS0 + CM0 + CAP;            /* Define CCR2, CAP, ACLK */
-    TACTL = TASSEL1 + TACLR + MC1;        /* SMCLK, continous mode */
+    TACTL = TASSEL1 + TACLR + MC1;        /* SMCLK, continuous mode */
 
     while (1) {
         unsigned int compare;
 
-        while ((CCTL2 & CCIFG) != CCIFG);   /* Wait until capture occured!*/
+        while ((CCTL2 & CCIFG) != CCIFG);   /* Wait until capture occurred!*/
 
-        CCTL2 &= ~CCIFG;                    /* Capture occured, clear flag */
+        CCTL2 &= ~CCIFG;                    /* Capture occurred, clear flag */
         compare = CCR2;                     /* Get current captured SMCLK */
         compare = compare - oldcapture;     /* SMCLK difference */
         oldcapture = CCR2;                  /* Save current captured SMCLK */
@@ -119,11 +119,7 @@ void board_init(void)
     WDTCTL     =  WDTPW + WDTHOLD;
 
     telosb_ports_init();
-
     msp430_init_dco();
-
-    /* initialize bsp modules */
-    uart_init();
 
     /* enable interrupts */
     __bis_SR_register(GIE);

@@ -1,19 +1,29 @@
-ifneq (,$(filter net_if,$(USEMODULE)))
-	INCLUDES += -I$(RIOTBASE)/sys/net/include/
+ifneq (,$(filter gnrc_netif_init,$(USEMODULE)))
+  DIRS += netif
 endif
 
-ifneq (,$(filter nomac,$(USEMODULE)))
-	INCLUDES += -I$(RIOTBASE)/sys/net/include/
+ifneq (,$(filter saul_init,$(USEMODULE)))
+  DIRS += saul
 endif
 
-DIRS += $(AUTO_INIT_MODULES)
-
-ifneq (,$(filter auto_init_ng_netif,$(USEMODULE)))
-DIRS += netif
+ifneq (,$(filter auto_init_can,$(USEMODULE)))
+  DIRS += can
 endif
 
-ifneq (,$(filter dev_eth_autoinit,$(USEMODULE)))
-DIRS += $(RIOTBASE)/sys/auto_init/dev_eth
+ifneq (,$(filter auto_init_loramac,$(USEMODULE)))
+  DIRS += loramac
+endif
+
+ifneq (,$(filter auto_init_multimedia,$(USEMODULE)))
+  DIRS += multimedia
+endif
+
+ifneq (,$(filter auto_init_usbus,$(USEMODULE)))
+  DIRS += usb
+endif
+
+ifneq (,$(filter auto_init_security,$(USEMODULE)))
+  DIRS += security
 endif
 
 include $(RIOTBASE)/Makefile.base

@@ -42,8 +42,7 @@
 #include "nrf24l01p_settings.h"
 #include "periph/spi.h"
 #include "periph/gpio.h"
-#include "vtimer.h"
-#include "hwtimer.h"
+#include "xtimer.h"
 #include "shell.h"
 #include "shell_commands.h"
 #include "thread.h"
@@ -51,18 +50,12 @@
 
 #define TEST_RX_MSG                1
 
-#define SHELL_BUFFER_SIZE        128
-
-static int shell_read(void);
-static void shell_write(int);
 static int cmd_send(int argc, char **argv);
 static int cmd_print_regs(int argc, char **argv);
 static int cmd_its(int argc, char **argv);
 
-
 void printbin(unsigned byte);
 void print_register(char reg, int num_bytes);
-
 
 static nrf24l01p_t nrf24l01p_0;
 
@@ -91,37 +84,27 @@ void prtbin(unsigned byte)
 void print_register(char reg, int num_bytes)
 {
 
-    vtimer_init();
-
     char buf_return[num_bytes];
-    int ret;
 
+    spi_transfer_regs(SPI_PORT, CS_PIN,
+                      (CMD_R_REGISTER | (REGISTER_MASK & reg)),
+                      NULL, (uint8_t *)buf_return, num_bytes);
 
-    gpio_clear(CS_PIN);
-    vtimer_usleep(1);
-    ret = spi_transfer_regs(SPI_PORT, (CMD_R_REGISTER | (REGISTER_MASK & reg)), 0, buf_return, num_bytes);
-    gpio_set(CS_PIN);
+    if (num_bytes < 2) {
+        printf("0x%x returned: ", reg);
 
-    if (ret < 0) {
-        printf("Error in read access\n");
+        for (int i = 0; i < num_bytes; i++) {
+            prtbin(buf_return[i]);
+        }
     }
     else {
-        if (num_bytes < 2) {
-            printf("0x%x returned: ", reg);
+        printf("0x%x returned: ", reg);
 
-            for (int i = 0; i < num_bytes; i++) {
-                prtbin(buf_return[i]);
-            }
+        for (int i = 0; i < num_bytes; i++) {
+            printf("%x ", buf_return[i]);
         }
-        else {
-            printf("0x%x returned: ", reg);
 
-            for (int i = 0; i < num_bytes; i++) {
-                printf("%x ", buf_return[i]);
-            }
-
-            printf("\n\n");
-        }
+        printf("\n\n");
     }
 }
 
@@ -130,6 +113,7 @@ char rx_handler_stack[THREAD_STACKSIZE_MAIN];
 /* RX handler that waits for a message from the ISR */
 void *nrf24l01p_rx_handler(void *arg)
 {
+    (void)arg;
     msg_t msg_q[1];
     msg_init_queue(msg_q, 1);
     unsigned int pid = thread_getpid();
@@ -148,16 +132,16 @@ void *nrf24l01p_rx_handler(void *arg)
                 puts("Received packet.");
 
                 /* CE low */
-                nrf24l01p_stop((nrf24l01p_t *)m.content.ptr);
+                nrf24l01p_stop(m.content.ptr);
 
                 /* read payload */
-                nrf24l01p_read_payload((nrf24l01p_t *)m.content.ptr, rx_buf, NRF24L01P_MAX_DATA_LENGTH);
+                nrf24l01p_read_payload(m.content.ptr, rx_buf, NRF24L01P_MAX_DATA_LENGTH);
 
                 /* flush rx fifo */
-                nrf24l01p_flush_rx_fifo((nrf24l01p_t *)m.content.ptr);
+                nrf24l01p_flush_rx_fifo(m.content.ptr);
 
                 /* CE high */
-                nrf24l01p_start((nrf24l01p_t *)m.content.ptr);
+                nrf24l01p_start(m.content.ptr);
 
                 /* print rx buffer */
                 for (int i = 0; i < NRF24L01P_MAX_DATA_LENGTH; i++) {
@@ -192,7 +176,7 @@ int cmd_its(int argc, char **argv)
     /* initialize transceiver device */
     if (nrf24l01p_init(&nrf24l01p_0, SPI_PORT, CE_PIN, CS_PIN, IRQ_PIN) < 0) {
         puts("Error in nrf24l01p_init");
-        return;
+        return 1;
     }
 
     /* create thread that gets msg when data arrives */
@@ -200,7 +184,7 @@ int cmd_its(int argc, char **argv)
         rx_handler_stack, sizeof(rx_handler_stack), THREAD_PRIORITY_MAIN - 1, 0,
         nrf24l01p_rx_handler, 0, "nrf24l01p_rx_handler") < 0) {
         puts("Error in thread_create");
-        return;
+        return 1;
     }
 
     /* setup device as receiver */
@@ -226,28 +210,28 @@ int cmd_send(int argc, char **argv)
     char tx_buf[NRF24L01P_MAX_DATA_LENGTH];
 
     /* fill TX buffer with numbers 32..1 */
-    for (int i = 0; i < sizeof(tx_buf); i++) {
+    for (size_t i = 0; i < sizeof(tx_buf); i++) {
         tx_buf[i] = NRF24L01P_MAX_DATA_LENGTH - i;
     }
     /* power on the device */
     if (nrf24l01p_on(&nrf24l01p_0) < 0) {
         puts("Error in nrf24l01p_on");
-        return;
+        return 1;
     }
     /* setup device as transmitter */
     if (nrf24l01p_set_txmode(&nrf24l01p_0) < 0) {
         puts("Error in nrf24l01p_set_txmode");
-        return;
+        return 1;
     }
     /* load data to transmit into device */
     if (nrf24l01p_preload(&nrf24l01p_0, tx_buf, NRF24L01P_MAX_DATA_LENGTH) < 0) {
         puts("Error in nrf24l01p_preload");
-        return;
+        return 1;
     }
     /* trigger transmitting */
     nrf24l01p_transmit(&nrf24l01p_0);
     /* wait while data is pysically transmitted  */
-    hwtimer_wait(DELAY_DATA_ON_AIR);
+    xtimer_usleep(DELAY_DATA_ON_AIR);
     /* get status of the transceiver */
     status = nrf24l01p_get_status(&nrf24l01p_0);
     if (status < 0) {
@@ -275,6 +259,7 @@ int cmd_print_regs(int argc, char **argv)
 
     printf("################## Print Registers ###################\n");
 
+    spi_acquire(SPI_PORT, CS_PIN, SPI_MODE_0, SPI_CLK_400KHZ);
 
     puts("REG_CONFIG: ");
     print_register(REG_CONFIG, 1);
@@ -324,19 +309,17 @@ int cmd_print_regs(int argc, char **argv)
     puts("REG_FEATURE: ");
     print_register(REG_FEATURE, 1);
 
+    spi_release(SPI_PORT);
+
     return 0;
 }
 
 int main(void)
 {
-    shell_t shell;
-
     puts("Welcome to RIOT!");
 
-    puts("Initializing shell...");
-    shell_init(&shell, shell_commands, SHELL_BUFFER_SIZE, getchar, putchar);
-
     puts("Starting shell...");
-    shell_run(&shell);
+    char line_buf[SHELL_DEFAULT_BUFSIZE];
+    shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
     return 0;
 }

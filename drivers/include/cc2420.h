@@ -1,409 +1,304 @@
-/**
-  * cc2420.h - Definitions for CC2420 functions.
-  * Copyright (C) 2013 Milan Babel <babel@inf.fu-berlin.de>
-  * Copyright (C) 2014 Kévin Roussel <Kevin.Roussel@inria.fr>
-  *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
-  */
-
+/*
+ * Copyright (C) 2015 Freie Universität Berlin
+ *
+ * This file is subject to the terms and conditions of the GNU Lesser General
+ * Public License v2.1. See the file LICENSE in the top level directory for more
+ * details.
+ */
 
 /**
-  * @ingroup CC2420
-  * @{
-  * @file
-  * @brief Definitions for CC2420 functions
-  * @author Milan Babel <babel@inf.fu-berlin.de>
-  *
-  */
-
-/**
-  * @brief Definition of the cc2420 layer 0 protocol
-  * <pre>
----------------------------------------------------------------------------
-|        |         |          |         |         |            |          |
-| Length |   FCF   |  Seq No. |Address  | PhySrc  |    Data    |    FCS   |
-|        |         |          |         |         |            |          |
----------------------------------------------------------------------------
- 1 byte    2 bytes     1 byte  2/8 bytes  2/8 bytes  <=118 bytes  2 bytes
-
-A 5 byte SHR will be generated and added in hardware.
-SHR contains a preable sequence and a start of delimiter,
-
-Length does not contain SHR and Length,
-first bit of length has to be 0 (length has only 7bit)
-
-Address fields can be in total between 4 and 20 bytes
-FCS contain a hardware generated CRC sum with the polynom x^16+x^12+x^5+1
-When receiving a package FCS will be checked by hardware, the first FCS byte will be replaced by RSSI,
-followed by a CRC OK bit and the unsigned 7 bit correlation value.
-FCF:
-        Bit | Meaning
-        --------------------
-        0-2 | Frame Type
-          3 | Security Enabled
-          4 | Frame Pending
-          5 | Acknowledge request
-          6 | PAN ID Compression Field
-        7-9 | Reserved
-      10-11 | Destination addressing mode
-      12-13 | Reserved
-      14-15 | Source addressing mode
-
-For the cc2420 bit 0 is the most right bit and bit 15 is the most left bit.
-But the 2 FCF bytes have to be transmitted littel endian (byte 15 to 8 first than 7 to 0)
-
-Addressing mode value:
-
-       Bit | Meaning
-       ---------------------
-        00 | PAN identifier and address field are not present.
-        01 | Reserved.
-        10 | Address field contains a 16 bit short address.
-        11 | Address field contains a 64 bit extended address.
-
-Frame type value:
-
-       Bit | Meaning
-       ---------------------
-       000 | Beacon
-       001 | Data
-       010 | Acknowledgment
-       011 | MAC command
-       1xx | Reserved
-  </pre>
-
-  *  This corresponds to IEEE 802.15.4 frame format.
-  */
+ * @defgroup    drivers_cc2420 CC2420 radio driver
+ * @ingroup     drivers_netdev
+ * @{
+ *
+ * @file
+ * @brief       Interface definition for the CC2420 driver
+ *
+ * @author      Thomas Eichinger <thomas.eichinger@fu-berlin.de>
+ * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
+ */
 
 #ifndef CC2420_H
 #define CC2420_H
 
-#include <stdbool.h>
+#include <stdint.h>
 
-#include "kernel_types.h"
-#include "ieee802154_frame.h"
-#include "cc2420_settings.h"
+#include "periph/spi.h"
+#include "periph/gpio.h"
 
-#include "radio_driver.h"
+#include "net/netdev.h"
+#include "net/netdev/ieee802154.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define CC2420_MAX_PKT_LENGTH 127
-#define CC2420_MAX_DATA_LENGTH (118)
-
-#define CC2420_BROADCAST_ADDRESS (0xFFFF)
-
-#define CC2420_MAX_UID (0xFFFE)
-#define CC2420_MIN_UID (0x0000)
+/**
+ * @brief   Maximum possible packet size in byte
+ */
+#define CC2420_PKT_MAXLEN       (IEEE802154_FRAME_LEN_MAX)
 
 /**
- *  Structure to represent a cc2420 packet.
- */
-typedef struct __attribute__ ((packed)) {
-    /* @{ */
-    uint8_t length;             /** < the length of the frame of the frame including fcs*/
-    ieee802154_frame_t frame;   /** < the ieee802154 frame */
-    int8_t rssi;                /** < the rssi value */
-    uint8_t lqi;                /** < the link quality indicator */
-    bool crc;                   /** < 1 if crc was successfull, 0 otherwise */
-    /* @} */
-} cc2420_packet_t;
+  * @name    Channel configuration
+  * @{
+  */
+#define CC2420_CHAN_MIN         (IEEE802154_CHANNEL_MIN)
+#define CC2420_CHAN_MAX         (IEEE802154_CHANNEL_MAX)
+#define CC2420_CHAN_DEFAULT     (CONFIG_IEEE802154_DEFAULT_CHANNEL)
+/** @} */
 
 /**
- * @brief Initialize the CC2420 transceiver.
+ * @name    Default TX power configuration [in dBm]
+ * @{
  */
-void cc2420_initialize(void);
+#define CC2420_TXPOWER_MIN      (-25)
+#define CC2420_TXPOWER_MAX      (0)
+#define CC2420_TXPOWER_DEFAULT  (CONFIG_IEEE802154_DEFAULT_TXPOWER)
+/** @} */
 
 /**
- * @brief Init the CC2420 for use with RIOT's transceiver module.
- *
- * @param[in] tpid The PID of the transceiver thread.
+ * @brief   RSSI offset
  */
-
-void cc2420_init(kernel_pid_t tpid);
+#define CC2420_RSSI_OFFSET      (-45)
 
 /**
- * @brief Turn CC2420 on.
- *
- * @return true if the radio was correctly turned on; false otherwise.
+ * @brief   A couple of return values used in this driver
  */
-bool cc2420_on(void);
+enum {
+    CC2420_RET_CHAN_OK      = 2,
+};
 
 /**
- * @brief Turn CC2420 off.
+ * @brief   Struct holding all parameters needed for device initialization
  */
-void cc2420_off(void);
+typedef struct cc2420_params {
+    spi_t spi;              /**< SPI bus the device is connected to */
+    spi_clk_t spi_clk;      /**< SPI speed to use */
+    gpio_t pin_cs;          /**< pin connected to chip select */
+    gpio_t pin_fifo;        /**< pin connected to the FIFO interrupt pin */
+    gpio_t pin_fifop;       /**< pin connected to the FIFOP interrupt pin */
+    gpio_t pin_cca;         /**< pin connected to CCA */
+    gpio_t pin_sfd;         /**< pin connected to 'start of frame delimiter' */
+    gpio_t pin_vrefen;      /**< pin connected to the Vref enable pin */
+    gpio_t pin_reset;       /**< pin connected to the reset pin */
+} cc2420_params_t;
 
 /**
- * @brief Indicate if the CC2420 is on.
- *
- * @return true if the radio transceiver is on (active); false otherwise.
+ * @brief   Device descriptor for CC2420 radio devices
  */
-bool cc2420_is_on(void);
+typedef struct {
+    /* netdev fields */
+    netdev_ieee802154_t netdev;   /**< netdev parent struct */
+    /* device specific fields */
+    cc2420_params_t params;       /**< hardware interface configuration */
+    /* device state fields */
+    uint8_t state;                /**< current state of the radio */
+    uint16_t options;             /**< state of used options */
+} cc2420_t;
 
 /**
- * @brief Switches the CC2420 into receive mode.
+ * @brief   Setup the device descriptor for the given device
+ *
+ * @param[out] dev          device descriptor
+ * @param[in]  params       device parameters
+ *
+ * @return                  0 on success
+ * @return                  -1 on error
  */
-void cc2420_switch_to_rx(void);
+void cc2420_setup(cc2420_t *dev, const cc2420_params_t *params);
 
 /**
- * @brief Turns monitor (promiscuous) mode on or off.
+ * @brief   Initialize a given CC2420 device
  *
- * @param[in] mode The desired mode:
- *                 true for monitor (promiscuous) mode;
- *                 false for normal (auto address-decoding) mode.
+ * @param[out] dev          device descriptor
+ *
+ * @return                  0 on success
+ * @return                  <0 on error
  */
-void cc2420_set_monitor(bool mode);
+int cc2420_init(cc2420_t *dev);
 
 /**
- * @brief Indicate if the CC2420 is in monitor (promiscuous) mode.
+ * @brief   Trigger a hardware reset and configure radio with default values
  *
- * @return true if the transceiver is in monitor (promiscuous) mode;
- *         false if it is in normal (auto address-decoding) mode.
+ * @param[in] dev           device to reset
+ *
+ * @return  TODO
  */
-bool cc2420_get_monitor(void);
+int cc2420_reset(cc2420_t *dev);
 
 /**
- * @brief Set the channel of the CC2420.
+ * @brief   Trigger a clear channel assessment
  *
- * @param[in] chan The desired channel, valid channels are from 11 to 26.
+ * @param[in] dev           device to use
  *
- * @return The tuned channel after calling, or -1 on error.
+ * @return                  true if channel is clear
+ * @return                  false if channel is busy
  */
-int cc2420_set_channel(unsigned int chan);
+bool cc2420_cca(cc2420_t *dev);
 
 /**
- * @brief Get the channel of the CC2420.
+ * @brief   Get the short address of the given device
  *
- * @return The tuned channel.
+ * @param[in]  dev          device to read from
+ * @param[out] addr         memory to write the 2 byte address into
  */
-unsigned int cc2420_get_channel(void);
+void cc2420_get_addr_short(cc2420_t *dev, uint8_t *addr);
 
 /**
- * @brief Sets the short address of the CC2420.
+ * @brief   Set the short address of the given device
  *
- * @param[in] addr The desired address.
- *
- * @return The set address after calling.
+ * @param[in] dev           device to write to
+ * @param[in] addr          (2-byte) short address to set
  */
-uint16_t cc2420_set_address(uint16_t addr);
+void cc2420_set_addr_short(cc2420_t *dev, const uint8_t *addr);
 
 /**
- * @brief Gets the current short address of the CC2420.
+ * @brief   Get the configured long address of the given device
  *
- * @return The current short address.
+ * @param[in]  dev           device to read from
+ * @param[out] addr_long     buffer to save the read address
+ *
+ * @return                  the currently set (8-byte) long address
  */
-uint16_t cc2420_get_address(void);
+void cc2420_get_addr_long(cc2420_t *dev, uint8_t *addr_long);
 
 /**
- * @brief Sets the IEEE long address of the CC2420.
+ * @brief   Set the long address of the given device
  *
- * @param[in] addr The desired address.
- *
- * @return The set address after calling.
+ * @param[in] dev           device to write to
+ * @param[in] addr_long     (8-byte) long address to set
  */
-uint64_t cc2420_set_address_long(uint64_t addr);
+void cc2420_set_addr_long(cc2420_t *dev, const uint8_t *addr_long);
 
 /**
- * @brief Gets the current IEEE long address of the CC2420.
+ * @brief   Get the configured PAN ID of the given device
  *
- * @return The current IEEE long address.
+ * @param[in] dev           device to read from
+ *
+ * @return                  the currently set PAN ID
  */
-uint64_t cc2420_get_address_long(void);
+uint16_t cc2420_get_pan(cc2420_t *dev);
 
 /**
- * @brief Sets the pan ID of the CC2420.
+ * @brief   Set the PAN ID of the given device
  *
- * @param[in] pan The desired pan ID.
- *
- * @return The set pan ID after calling.
+ * @param[in] dev           device to write to
+ * @param[in] pan           PAN ID to set
  */
-uint16_t cc2420_set_pan(uint16_t pan);
+void cc2420_set_pan(cc2420_t *dev, uint16_t pan);
 
 /**
- * @brief Gets the current IEEE long address of the CC2420.
+ * @brief   Get the configured channel of the given device
  *
- * @return The current IEEE long address.
+ * @param[in] dev           device to read from
+ *
+ * @return                  the currently set channel
  */
-uint16_t cc2420_get_pan(void);
+uint16_t cc2420_get_chan(cc2420_t *dev);
 
 /**
- * @brief Sets the output (TX) power of the CC2420.
+ * @brief   Set the channel of the given device
  *
- * @param[in] pow The desired TX (output) power in dBm,
- *                 valid values are -25 to 0; other values
- *                 will be "saturated" into this range.
- *
- * @return The set TX (output) power after calling.
+ * @param[in] dev           device to write to
+ * @param[in] chan          channel to set
  */
-int cc2420_set_tx_power(int pow);
+int cc2420_set_chan(cc2420_t *dev, uint16_t chan);
 
 /**
- * @brief Gets the current output (TX) power of the CC2420.
+ * @brief   Get the configured transmission power of the given device [in dBm]
  *
- * @return The current TX (output) power.
+ * @param[in] dev           device to read from
+ *
+ * @return                  configured transmission power in dBm
  */
-int cc2420_get_tx_power(void);
+int16_t cc2420_get_txpower(cc2420_t *dev);
 
 /**
- * @brief Checks if the radio medium is available/clear to send
- *         ("Clear Channel Assessment" a.k.a. CCA).
+ * @brief   Set the transmission power of the given device [in dBm]
  *
- * @return a `true` value if radio medium is clear (available),
- *         a `false` value otherwise.
+ * If the device does not support the exact dBm value given, it will set a value
+ * as close as possible to the given value. If the given value is larger or
+ * lower then the maximal or minimal possible value, the min or max value is
+ * set, respectively.
  *
+ * @param[in] dev           device to write to
+ * @param[in] txpower       transmission power in dBm
  */
-bool cc2420_channel_clear(void);
+void cc2420_set_txpower(cc2420_t *dev, int16_t txpower);
 
 /**
- * @brief Interrupt handler, gets fired when a RX overflow happens.
+ * @brief   Enable or disable driver specific options
  *
+ * @param[in] dev           device to set/clear option flag for
+ * @param[in] option        option to enable/disable
+ * @param[in] state         true for enable, false for disable
  */
-void cc2420_rxoverflow_irq(void);
+int cc2420_set_option(cc2420_t *dev, uint16_t option, bool state);
 
 /**
- * @brief Interrupt handler, gets fired when bytes in the RX FIFO are present.
+ * @brief   Set the state of the given device (trigger a state change)
  *
+ * @param[in] dev           device to change state of
+ * @param[in] state         the targeted new state
  */
-void cc2420_rx_irq(void);
+int cc2420_set_state(cc2420_t *dev, netopt_state_t state);
 
 /**
- * @brief Sets the function called back when a packet is received.
- *        (Low-level mechanism, parallel to the `transceiver` module).
+ * @brief   Get the state of the given device
  *
- * @param[in] recv_cb callback function for 802.15.4 packet arrival;
- *                    pass `NULL` to deactivate packet reception.
+ * @param[in] dev           device to change state of
+ *
+ * @return                  the device's current state
  */
-void cc2420_set_recv_callback(receive_802154_packet_callback_t recv_cb);
+netopt_state_t cc2420_get_state(cc2420_t *dev);
 
 /**
- * @brief RX handler, process data from the RX FIFO.
+ * @brief   Convenience function for simply sending data
  *
+ * @note This function ignores the PRELOADING option
+ *
+ * @param[in] dev           device to use for sending
+ * @param[in] iolist        data to send (must include IEEE802.15.4 header)
+ *
+ * @return                  number of bytes that were actually send
+ * @return                  0 on error
  */
-void cc2420_rx_handler(void);
+size_t cc2420_send(cc2420_t *dev, const iolist_t *iolist);
 
 /**
- * @brief Prepare the CC2420 TX buffer to send with the given packet.
+ * @brief   Prepare for sending of data
  *
- * @param[in] kind Kind of packet to transmit.
- * @param[in] dest Address of the node to which the packet is sent.
- * @param[in] use_long_addr `true` to use the 64-bit address mode
- *                          with `dest` param; `false` to use
- *                          "short" PAN-centric mode.
- * @param[in] wants_ack `true` to request an acknowledgement
- *                      from the receiving node for this packet;
- *                      `false` otherwise.
- * @param[in] buf Pointer to the buffer containing the payload
- *                of the 802.15.4 packet to transmit.
- *                The frame header (i.e.: FCS, sequence number,
- *                src and dest PAN and addresses) is inserted
- *                using values in accord with `kind` parameter
- *                and transceiver configuration.
- * @param[in] len Length (in bytes) of the outgoing packet payload.
+ * This function puts the given device into the TX state, so no receiving of
+ * data is possible after it was called.
  *
- * @return `true` if the transceiver TX buffer was loaded correctly;
- *         `false` otherwise (transceiver error).
+ * @param[in] dev           device to prepare for sending
+ * @param[in] iolist        data to prepare (must include IEEE802.15.4 header)
  */
-radio_tx_status_t cc2420_load_tx_buf(ieee802154_packet_kind_t kind,
-                                     ieee802154_node_addr_t dest,
-                                     bool use_long_addr,
-                                     bool wants_ack,
-                                     void *buf,
-                                     unsigned int len);
+size_t cc2420_tx_prepare(cc2420_t *dev, const iolist_t *iolist);
 
 /**
- * @brief Transmit the data loaded into the CC2420 TX buffer.
+ * @brief   Trigger sending of data previously loaded into transmit buffer
  *
- * @return The outcome of this packet's transmission.
- *         @see radio_tx_status_t
+ * @param[in] dev           device to trigger
  */
-radio_tx_status_t cc2420_transmit_tx_buf(void);
+void cc2420_tx_exec(cc2420_t *dev);
 
 /**
- * @brief Transmit the given IEEE 802.15.4 packet,
- *        by calling successively functions`load_tx()`
- *        and `transmit()`.
+ * @brief   Read a chunk of data from the receive buffer of the given device
  *
- * @param[in] kind Kind of packet to transmit.
- * @param[in] dest Address of the node to which the packet is sent.
- * @param[in] use_long_addr `true` to use the 64-bit address mode
- *                          with `dest` param; `false` to use
- *                          "short" PAN-centric mode.
- * @param[in] wants_ack `true` to request an acknowledgement
- *                      from the receiving node for this packet;
- *                      `false` otherwise.
- * @param[in] buf Pointer to the buffer containing the payload
- *                of the 802.15.4 packet to transmit.
- *                The frame header (i.e.: FCS, sequence number,
- *                src and dest PAN and addresses) is inserted
- *                using values in accord with `kind` parameter
- *                and transceiver configuration.
- * @param[in] len Length (in bytes) of the outgoing packet payload.
+ * @param[in]  dev          device to read from
+ * @param[out] buf          buffer to write data to
+ * @param[in]  max_len      number of bytes to read from device
+ * @param[in]  info         to be removed
  *
- * @return The outcome of this packet's transmission.
- *         @see radio_tx_status_t
+ * @return                  the number of bytes in the Rx FIFO
+ * @return                  the number of bytes written to @p buf if present
  */
-radio_tx_status_t cc2420_do_send(ieee802154_packet_kind_t kind,
-                                 ieee802154_node_addr_t dest,
-                                 bool use_long_addr,
-                                 bool wants_ack,
-                                 void *buf,
-                                 unsigned int len);
-
-/**
- * @brief Send function, sends a cc2420_packet_t over the air.
- *
- * @param[in] *packet The Packet which will be send.
- *
- * @return The count of bytes which are send or -1 on error
- *
- */
-int16_t cc2420_send(cc2420_packet_t *packet);
-
-/*
- * RX Packet Buffer, read from the transceiver, filled by the cc2420_rx_handler.
- */
-extern cc2420_packet_t cc2420_rx_buffer[CC2420_RX_BUF_SIZE];
-
-
-/** Utility macro: get CC2420's status byte */
-#define cc2420_status_byte() cc2420_strobe(NOBYTE)
-
-
-/* setter functions wrappers, to maintain compatibility with both
-   ieee802154_radio_driver_t and transceiver module */
-
-static inline void do_set_channel(unsigned int chan) {
-    cc2420_set_channel(chan);
-}
-
-static inline void do_set_address(uint16_t addr) {
-    cc2420_set_address(addr);
-}
-
-static inline void do_set_long_address(uint64_t addr) {
-    cc2420_set_address_long(addr);
-}
-
-static inline void do_set_pan_id(uint16_t pan) {
-    cc2420_set_pan(pan);
-}
-
-static inline void do_set_tx_power(int pow) {
-    cc2420_set_tx_power(pow);
-}
-
-/**
- * CC2420 low-level radio driver definition.
- */
-extern const ieee802154_radio_driver_t cc2420_radio_driver;
+int cc2420_rx(cc2420_t *dev, uint8_t *buf, size_t max_len, void *info);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
+#endif /* CC2420_H */
+/** @} */

@@ -1,12 +1,12 @@
-APPLICATION = bloom_bytes
 include ../Makefile.tests_common
-
-BOARD_INSUFFICIENT_RAM := stm32f0discovery
 
 USEMODULE += hashes
 USEMODULE += bloom
 USEMODULE += random
+USEMODULE += xtimer
 
-DISABLE_MODULE += auto_init
+USEMODULE += fmt
+
+DISABLE_MODULE += auto_init_random
 
 include $(RIOTBASE)/Makefile.include

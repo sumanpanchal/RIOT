@@ -1,0 +1,2 @@
+# this board uses openocd
+PROGRAMMER ?= openocd

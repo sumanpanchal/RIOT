@@ -17,7 +17,7 @@
  * 1.000 -- 2.000 ms, roughly -/+ 90 degrees from the middle position if the
  * connected servo is a standard RC servo.
  *
- * @author      Joakim Gebart <joakim.gebart@eistec.se>
+ * @author      Joakim Nohlgård <joakim.nohlgard@eistec.se>
  *
  * @}
  */
@@ -26,11 +26,11 @@
 
 #include "cpu.h"
 #include "board.h"
-#include "vtimer.h"
+#include "xtimer.h"
 #include "periph/pwm.h"
 #include "servo.h"
 
-#define DEV         PWM_0
+#define DEV         PWM_DEV(0)
 #define CHANNEL     0
 
 #define SERVO_MIN        (1000U)
@@ -53,7 +53,7 @@ static servo_t servo;
 int main(void)
 {
     int res;
-    int pos = (STEP_LOWER_BOUND + STEP_UPPER_BOUND) / 2;
+    unsigned int pos = (STEP_LOWER_BOUND + STEP_UPPER_BOUND) / 2;
     int step = STEP;
 
     puts("\nRIOT RC servo test");
@@ -74,7 +74,7 @@ int main(void)
             step = -step;
         }
 
-        vtimer_usleep(WAIT);
+        xtimer_usleep(WAIT);
     }
 
     return 0;

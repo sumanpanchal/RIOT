@@ -7,22 +7,17 @@
  */
 
 /**
- * @addtogroup  core_util
+ * @ingroup     core_util
  * @{
  *
  * @file
  * @brief       Debug-header
  *
  * @details     If *ENABLE_DEBUG* is defined inside an implementation file, all
- *              calls to ::DEBUG and ::DEBUGF* will work the same as *printf*
- *              and output the given information to stdout. If *ENABLE_DEBUG*
- *              is not defined, all calls to ::DEBUG and ::DEBUGF will be
- *              ignored.
+ *              calls to ::DEBUG will work the same as *printf* and output the
+ *              given information to stdout. If *ENABLE_DEBUG* is not defined,
+ *              all calls to ::DEBUG will be ignored.
  *
- *              In addition to just printing the given information ::DEBUGF
- *              will further print extended debug information about the current
- *              thread and function.
-     *
  * @author      Kaspar Schleiser <kaspar@schleiser.de>
  */
 
@@ -38,13 +33,6 @@ extern "C" {
 #endif
 
 /**
- * @def ENABLE_DEBUG
- * @brief   This macro can be defined as 0 or other on a file-based level.
- *          If ENABLE_DEBUG is 0 @ref DEBUG() and @ref DEBUGF() will generate
- *          no output if not they will generate output.
- */
-
-/**
  * @def DEBUG_PRINT
  *
  * @brief Print debug information if the calling thread stack is large enough
@@ -54,15 +42,17 @@ extern "C" {
  * information to stdout after verifying the stack is big enough. If `DEVELHELP`
  * is not set, this check is not performed. (CPU exception may occur)
  */
-#if DEVELHELP
+#ifdef DEVELHELP
 #include "cpu_conf.h"
 #define DEBUG_PRINT(...) \
     do { \
-        if ((sched_active_thread == NULL) || (sched_active_thread->stack_size > THREAD_EXTRA_STACKSIZE_PRINTF)) { \
+        if ((thread_get_active() == NULL) || \
+            (thread_get_active()->stack_size >= \
+             THREAD_EXTRA_STACKSIZE_PRINTF)) { \
             printf(__VA_ARGS__); \
         } \
         else { \
-            puts("Cannot debug, stack too small"); \
+            puts("Cannot debug, stack too small. Consider using DEBUG_PUTS()."); \
         } \
     } while (0)
 #else
@@ -70,11 +60,16 @@ extern "C" {
 #endif
 
 /**
- *
+ * @name Debugging defines
  * @{
  */
-#if ENABLE_DEBUG
-#include "tcb.h"
+/**
+ * @brief   This macro can be defined as 0 or other on a file-based level.
+ *          @ref DEBUG() will generate output only if ENABLE_DEBUG is non-zero.
+ */
+#if !defined(ENABLE_DEBUG) || defined(DOXYGEN)
+#define ENABLE_DEBUG 0
+#endif
 
 /**
  * @def DEBUG_FUNC
@@ -99,24 +94,15 @@ extern "C" {
  *
  * @note Another name for ::DEBUG_PRINT
  */
-#define DEBUG(...) DEBUG_PRINT(__VA_ARGS__)
+#define DEBUG(...) if (ENABLE_DEBUG) { DEBUG_PRINT(__VA_ARGS__); }
+
 /**
- * @def DEBUGF
+ * @def DEBUG_PUTS
  *
- * @brief Print extended debug information about the current thread and
- *        function to stdout
+ * @brief Print debug information to stdout using puts(), so no stack size
+ *        restrictions do apply.
  */
-#define DEBUGF(...) \
-    do { \
-        DEBUG_PRINT("DEBUG(%s): %s:%d in %s: ", \
-                sched_active_thread ? sched_active_thread->name : "NO THREAD", \
-                __FILE__, __LINE__, DEBUG_FUNC); \
-        DEBUG_PRINT(__VA_ARGS__); \
-    } while (0)
-#else
-#define DEBUG(...)
-#define DEBUGF(...)
-#endif
+#define DEBUG_PUTS(str) if (ENABLE_DEBUG) { puts(str); }
 /** @} */
 
 /**

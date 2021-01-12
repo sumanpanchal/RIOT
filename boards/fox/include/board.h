@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
+ * Copyright (C) 2014-2015 Freie Universität Berlin
  *
  * This file is subject to the terms and conditions of the GNU Lesser General
  * Public License v2.1. See the file LICENSE in the top level directory for more
@@ -7,13 +7,11 @@
  */
 
 /**
- * @defgroup    boards_fox fox
- * @ingroup     boards
- * @brief       Board specific files for the fox board.
+ * @ingroup     boards_fox
  * @{
  *
  * @file
- * @brief       Board specific definitions for the fox board.
+ * @brief       Board specific definitions for the fox board
  *
  * @author      Alaeddine Weslati <alaeddine.weslati@inria.fr>
  * @author      Thomas Eichinger <thomas.eichinger@fu-berlin.de>
@@ -21,8 +19,8 @@
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef BOARD_H_
-#define BOARD_H_
+#ifndef BOARD_H
+#define BOARD_H
 
 #include <stdint.h>
 
@@ -34,99 +32,72 @@ extern "C" {
 #endif
 
 /**
- * Define the nominal CPU core clock in this board
- */
-#define F_CPU               CLOCK_CORECLOCK
-
-/**
- * @name Define the UART to be used as stdio and its baudrate
+ * @name    Xtimer configuration
+ *
+ * Tell the xtimer that we use a 16-bit peripheral timer
  * @{
  */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      (115200)
-#define STDIO_RX_BUFSIZE    (64U)
+#define XTIMER_WIDTH        (16)
 /** @} */
 
 /**
- * Assign the hardware timer
- */
-#define HW_TIMER            TIMER_0
-
-/**
- * @name Define the interface to the AT86RF231 radio
+ * @name    Define the interface to the AT86RF231 radio
+ *
+ * {spi bus, spi speed, cs pin, int pin, reset pin, sleep pin}
  * @{
  */
-#define AT86RF231_SPI       SPI_0
-#define AT86RF231_CS        GPIO_11
-#define AT86RF231_INT       GPIO_12
-#define AT86RF231_RESET     GPIO_13
-#define AT86RF231_SLEEP     GPIO_14
+#define AT86RF2XX_PARAM_CS         GPIO_PIN(PORT_A, 1)
+#define AT86RF2XX_PARAM_INT        GPIO_PIN(PORT_C, 2)
+#define AT86RF2XX_PARAM_SLEEP      GPIO_PIN(PORT_A, 0)
+#define AT86RF2XX_PARAM_RESET      GPIO_PIN(PORT_C, 1)
 /** @} */
 
 /**
- * @name Define the interface to the LPS331AP pressure sensor
+ * @name    Define the interface to the LPS331AP pressure sensor
  * @{
  */
-#define LPS331AP_I2C        I2C_0
-#define LPS331AP_ADDR       0x5c
+#define LPSXXX_PARAM_ADDR          (0x5C)
 /** @} */
 
 /**
- * @name Define the interface for the L3G4200D gyroscope
+ * @name    Define the interface for the L3G4200D gyroscope
  * @{
  */
-#define L3G4200D_I2C        I2C_0
-#define L3G4200D_ADDR       0x68
-#define L3G4200D_DRDY       GPIO_2
-#define L3G4200D_INT        GPIO_1
+#define L3G4200D_PARAM_INT2        GPIO_PIN(PORT_B, 8)
+#define L3G4200D_PARAM_INT1        GPIO_PIN(PORT_B, 11)
 /** @} */
 
 /**
- * @name Define the interface to the LSM303DLHC accelerometer and magnetometer
+ * @name    Define the interface to the LSM303DLHC accelerometer and magnetometer
  * @{
  */
-#define LSM303DLHC_I2C      I2C_0
-#define LSM303DLHC_ACC_ADDR (25)
-#define LSM303DLHC_MAG_ADDR (30)
-#define LSM303DLHC_INT1     GPIO_4
-#define LSM303DLHC_INT2     GPIO_3
-#define LSM303DLHC_DRDY     GPIO_9
+#define LSM303DLHC_PARAM_ACC_ADDR  (0x25)
+#define LSM303DLHC_PARAM_MAG_ADDR  (0x30)
+#define LSM303DLHC_PARAM_ACC_PIN   GPIO_PIN(PORT_B, 9)
+#define LSM303DLHC_PARAM_MAG_PIN   GPIO_PIN(PORT_A, 9)
 /** @} */
 
 /**
- * @name LED pin definitions
+ * @name    LED pin definitions and handlers
  * @{
  */
-#define LED_RED_PORT        (GPIOB)
-#define LED_RED_PIN         (10)
-#define LED_GREEN_PORT      (GPIOB)
-#define LED_GREEN_PIN       (12)
+#define LED0_PIN            GPIO_PIN(PORT_B, 10)
+#define LED1_PIN            GPIO_PIN(PORT_B, 12)
+
+#define LED0_MASK           (1 << 10)
+#define LED1_MASK           (1 << 12)
+
+#define LED0_ON             (GPIOB->ODR &= ~LED0_MASK)
+#define LED0_OFF            (GPIOB->ODR |=  LED0_MASK)
+#define LED0_TOGGLE         (GPIOB->ODR ^=  LED0_MASK)
+
+#define LED1_ON             (GPIOB->ODR &= ~LED1_MASK)
+#define LED1_OFF            (GPIOB->ODR |=  LED1_MASK)
+#define LED1_TOGGLE         (GPIOB->ODR ^=  LED1_MASK)
 /** @} */
 
 /**
- * @name Macros for controlling the on-board LEDs.
- * @{
- */
-#define LED_RED_ON          (LED_RED_PORT->ODR &= ~(1<<LED_RED_PIN))
-#define LED_RED_OFF         (LED_RED_PORT->ODR |= (1<<LED_RED_PIN))
-#define LED_RED_TOGGLE      (LED_RED_PORT->ODR ^= (1<<LED_RED_PIN))
-
-#define LED_GREEN_ON        (LED_GREEN_PORT->ODR &= ~(1<<LED_GREEN_PIN))
-#define LED_GREEN_OFF       (LED_GREEN_PORT->ODR |= (1<<LED_GREEN_PIN))
-#define LED_GREEN_TOGGLE    (LED_GREEN_PORT->ODR ^= (1<<LED_GREEN_PIN))
-
-#define LED_ORANGE_ON
-#define LED_ORANGE_OFF
-#define LED_ORANGE_TOGGLE
-/** @} */
-
-/**
- * Define the type for the radio packet length for the transceiver
- */
-typedef uint8_t radio_packet_length_t;
-
-/**
- * @brief Initialize board specific hardware, including clock, LEDs and std-IO
+ * @brief   Initialize board specific hardware, including clock, LEDs and std-IO
  */
 void board_init(void);
 
@@ -134,5 +105,5 @@ void board_init(void);
 }
 #endif
 
-#endif /* BOARD_H_ */
+#endif /* BOARD_H */
 /** @} */

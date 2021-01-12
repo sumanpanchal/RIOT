@@ -1,173 +1,188 @@
-ifneq (,$(filter pnet,$(USEMODULE)))
-    DIRS += posix/pnet
+# SORT THIS ALPHABETICALLY BY MODULE NAME!
+ifneq (,$(filter asymcute,$(USEMODULE)))
+  DIRS += net/application_layer/asymcute
 endif
-ifneq (,$(filter pthread,$(USEMODULE)))
-    DIRS += posix/pthread
+ifneq (,$(filter bluetil_%,$(USEMODULE)))
+  DIRS += net/ble/bluetil
 endif
-ifneq (,$(filter shell_commands,$(USEMODULE)))
-    DIRS += shell/commands
+ifneq (,$(filter cipher_modes,$(USEMODULE)))
+  DIRS += crypto/modes
 endif
-ifneq (,$(filter net_if,$(USEMODULE)))
-    DIRS += net/link_layer/net_if
+ifneq (,$(filter constfs,$(USEMODULE)))
+  DIRS += fs/constfs
 endif
-ifneq (,$(filter l2_ping,$(USEMODULE)))
-    DIRS += net/link_layer/ping
+ifneq (,$(filter cord_common,$(USEMODULE)))
+  DIRS += net/application_layer/cord/common
 endif
-ifneq (,$(filter transport_layer,$(USEMODULE)))
-    USEMODULE += udp
-    USEMODULE += tcp
+ifneq (,$(filter cord_ep,$(USEMODULE)))
+    DIRS += net/application_layer/cord/ep
 endif
-ifneq (,$(filter socket_base,$(USEMODULE)))
-    DIRS += net/transport_layer/socket_base
+ifneq (,$(filter cord_epsim,$(USEMODULE)))
+    DIRS += net/application_layer/cord/epsim
 endif
-ifneq (,$(filter udp,$(USEMODULE)))
-    DIRS += net/transport_layer/udp
-endif
-ifneq (,$(filter tcp,$(USEMODULE)))
-    DIRS += net/transport_layer/tcp
-endif
-ifneq (,$(filter net_help,$(USEMODULE)))
-    DIRS += net/crosslayer/net_help
-endif
-ifneq (,$(filter protocol_multiplex,$(USEMODULE)))
-    DIRS += net/link_layer/protocol-multiplex
-endif
-ifneq (,$(filter sixlowpan,$(USEMODULE)))
-    DIRS += net/network_layer/sixlowpan
-endif
-ifneq (,$(filter sixlowborder,$(USEMODULE)))
-    DIRS += net/network_layer/sixlowpan/border
-endif
-ifneq (,$(filter rpl,$(USEMODULE)))
-    DIRS += net/routing/rpl
-endif
-ifneq (,$(filter routing,$(USEMODULE)))
-    DIRS += net/routing
-endif
-ifneq (,$(filter aodvv2,$(USEMODULE)))
-    DIRS += net/routing/aodvv2
-endif
-ifneq (,$(filter ieee802154,$(USEMODULE)))
-    DIRS += net/link_layer/ieee802154
-endif
-ifneq (,$(filter ccn_lite,$(USEMODULE)))
-    DIRS += net/ccn_lite
-endif
-ifneq (,$(filter ccn_lite_client,$(USEMODULE)))
-    DIRS += net/ccn_lite/util
-endif
-ifneq (,$(filter oneway_malloc,$(USEMODULE)))
-    DIRS += oneway-malloc
-endif
-ifneq (,$(filter ng_icmpv6,$(USEMODULE)))
-    DIRS += net/network_layer/ng_icmpv6
-endif
-ifneq (,$(filter ng_icmpv6_echo,$(USEMODULE)))
-    DIRS += net/network_layer/ng_icmpv6/echo
-endif
-ifneq (,$(filter ng_ipv6,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6
-endif
-ifneq (,$(filter ng_ipv6_addr,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/addr
-endif
-ifneq (,$(filter ng_ipv6_ext,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/ext
-endif
-ifneq (,$(filter ng_ipv6_ext_rh,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/ext/rh
-endif
-ifneq (,$(filter ng_ipv6_hdr,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/hdr
-endif
-ifneq (,$(filter ng_ipv6_nc,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/nc
-endif
-ifneq (,$(filter ng_ipv6_netif,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ipv6/netif
-endif
-ifneq (,$(filter ng_inet_csum,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_inet_csum
-endif
-ifneq (,$(filter ng_ndp,$(USEMODULE)))
-    DIRS += net/network_layer/ng_ndp
-endif
-ifneq (,$(filter ng_netapi,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_netapi
-endif
-ifneq (,$(filter ng_netif,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_netif
-endif
-ifneq (,$(filter ng_netif_hdr,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_netif/hdr
-endif
-ifneq (,$(filter ng_netreg,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_netreg
-endif
-ifneq (,$(filter ng_nettest,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_nettest
-endif
-ifneq (,$(filter ng_nomac,$(USEMODULE)))
-    DIRS += net/link_layer/ng_nomac
-endif
-ifneq (,$(filter ng_pktbuf,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_pktbuf
-endif
-ifneq (,$(filter ng_zep,$(USEMODULE)))
-    DIRS += net/application_layer/ng_zep
-endif
-ifneq (,$(filter ng_rpl_srh,$(USEMODULE)))
-    DIRS += net/routing/ng_rpl/srh
-endif
-ifneq (,$(filter ng_sixlowpan,$(USEMODULE)))
-    DIRS += net/network_layer/ng_sixlowpan
-endif
-ifneq (,$(filter ng_sixlowpan_ctx,$(USEMODULE)))
-    DIRS += net/network_layer/ng_sixlowpan/ctx
-endif
-ifneq (,$(filter ng_sixlowpan_frag,$(USEMODULE)))
-    DIRS += net/network_layer/ng_sixlowpan/frag
-endif
-ifneq (,$(filter ng_sixlowpan_iphc,$(USEMODULE)))
-    DIRS += net/network_layer/ng_sixlowpan/iphc
-endif
-ifneq (,$(filter ng_sixlowpan_netif,$(USEMODULE)))
-    DIRS += net/network_layer/ng_sixlowpan/netif
-endif
-ifneq (,$(filter ng_slip,$(USEMODULE)))
-    DIRS += net/link_layer/ng_slip
-endif
-ifneq (,$(filter netapi,$(USEMODULE)))
-    DIRS += net/crosslayer/netapi
-endif
-ifneq (,$(filter trickle,$(USEMODULE)))
-    DIRS += trickle
-endif
-ifneq (,$(filter nhdp,$(USEMODULE)))
-    DIRS += net/routing/nhdp
-endif
-ifneq (,$(filter ng_pktdump,$(USEMODULE)))
-    DIRS += net/crosslayer/ng_pktdump
-endif
-ifneq (,$(filter fib,$(USEMODULE)))
-    DIRS += net/network_layer/fib
-endif
-ifneq (,$(filter ng_udp,$(USEMODULE)))
-    DIRS += net/transport_layer/ng_udp
-endif
-ifneq (,$(filter hwtimer_compat,$(USEMODULE)))
-    DIRS += compat/hwtimer
-endif
-ifneq (,$(filter log_%,$(USEMODULE)))
-    DIRS += log
+ifneq (,$(filter cord_lc,$(USEMODULE)))
+    DIRS += net/application_layer/cord/lc
 endif
 ifneq (,$(filter cpp11-compat,$(USEMODULE)))
-    DIRS += cpp11-compat
+  DIRS += cpp11-compat
 endif
-ifneq (,$(filter ng_netdev_eth,$(USEMODULE)))
-    DIRS += net/link_layer/ng_netdev_eth
+ifneq (,$(filter credman,$(USEMODULE)))
+  DIRS += net/credman
+endif
+ifneq (,$(filter csma_sender,$(USEMODULE)))
+  DIRS += net/link_layer/csma_sender
+endif
+ifneq (,$(filter devfs,$(USEMODULE)))
+  DIRS += fs/devfs
+endif
+ifneq (,$(filter dhcpv6,$(USEMODULE)))
+  DIRS += net/application_layer/dhcpv6
+endif
+ifneq (,$(filter dummy_thread,$(USEMODULE)))
+  DIRS += test_utils/dummy_thread
+endif
+ifneq (,$(filter eepreg,$(USEMODULE)))
+  DIRS += eepreg
+endif
+ifneq (,$(filter emcute,$(USEMODULE)))
+  DIRS += net/application_layer/emcute
+endif
+ifneq (,$(filter eui_provider,$(USEMODULE)))
+  DIRS += net/link_layer/eui_provider
+endif
+ifneq (,$(filter fib,$(USEMODULE)))
+  DIRS += net/network_layer/fib
+endif
+ifneq (,$(filter gcoap,$(USEMODULE)))
+  DIRS += net/application_layer/gcoap
+endif
+ifneq (,$(filter gnrc gnrc_%,$(USEMODULE)))
+  DIRS += net/gnrc
+endif
+ifneq (,$(filter gnrc_uhcpc,$(USEMODULE)))
+  DIRS += net/gnrc/application_layer/uhcpc
+endif
+ifneq (,$(filter icmpv6,$(USEMODULE)))
+  DIRS += net/network_layer/icmpv6
+endif
+ifneq (,$(filter ieee802154,$(USEMODULE)))
+  DIRS += net/link_layer/ieee802154
+endif
+ifneq (,$(filter inet_csum,$(USEMODULE)))
+  DIRS += net/crosslayer/inet_csum
+endif
+ifneq (,$(filter ipv4_addr,$(USEMODULE)))
+  DIRS += net/network_layer/ipv4/addr
+endif
+ifneq (,$(filter ipv6_addr,$(USEMODULE)))
+  DIRS += net/network_layer/ipv6/addr
+endif
+ifneq (,$(filter ipv6_hdr,$(USEMODULE)))
+  DIRS += net/network_layer/ipv6/hdr
+endif
+ifneq (,$(filter isrpipe_read_timeout,$(USEMODULE)))
+  DIRS += isrpipe/read_timeout
+endif
+ifneq (,$(filter l2filter,$(USEMODULE)))
+  DIRS += net/link_layer/l2filter
+endif
+ifneq (,$(filter l2util,$(USEMODULE)))
+  DIRS += net/link_layer/l2util
+endif
+ifneq (,$(filter log_%,$(USEMODULE)))
+  DIRS += log
+endif
+ifneq (,$(filter nanocoap,$(USEMODULE)))
+  DIRS += net/application_layer/nanocoap
+endif
+ifneq (,$(filter net_help,$(USEMODULE)))
+  DIRS += net/crosslayer/net_help
+endif
+ifneq (,$(filter netdev_test,$(USEMODULE)))
+  DIRS += net/netdev_test
+endif
+ifneq (,$(filter netif,$(USEMODULE)))
+    DIRS += net/netif
+endif
+ifneq (,$(filter netopt,$(USEMODULE)))
+  DIRS += net/crosslayer/netopt
+endif
+ifneq (,$(filter sema,$(USEMODULE)))
+  DIRS += sema
+endif
+ifneq (,$(filter sixlowpan,$(USEMODULE)))
+  DIRS += net/network_layer/sixlowpan
+endif
+ifneq (,$(filter sntp,$(USEMODULE)))
+  DIRS += net/application_layer/sntp
+endif
+ifneq (,$(filter sock_async_event,$(USEMODULE)))
+  DIRS += net/sock/async/event
+endif
+ifneq (,$(filter sock_dns,$(USEMODULE)))
+  DIRS += net/application_layer/dns
+endif
+ifneq (,$(filter sock_util,$(USEMODULE)))
+  DIRS += net/sock
+endif
+ifneq (,$(filter oneway_malloc,$(USEMODULE)))
+  DIRS += oneway-malloc
+endif
+ifneq (,$(filter posix_inet,$(USEMODULE)))
+  DIRS += posix/inet
+endif
+ifneq (,$(filter posix_select,$(USEMODULE)))
+  DIRS += posix/select
+endif
+ifneq (,$(filter posix_semaphore,$(USEMODULE)))
+  DIRS += posix/semaphore
+endif
+ifneq (,$(filter posix_sockets,$(USEMODULE)))
+  DIRS += posix/sockets
+endif
+ifneq (,$(filter posix_sleep,$(USEMODULE)))
+  DIRS += posix/sleep
+endif
+ifneq (,$(filter pthread,$(USEMODULE)))
+  DIRS += posix/pthread
+endif
+ifneq (,$(filter routing,$(USEMODULE)))
+  DIRS += net/routing
+endif
+ifneq (,$(filter skald,$(USEMODULE)))
+  DIRS += net/ble/skald
+endif
+ifneq (,$(filter shell_commands,$(USEMODULE)))
+  DIRS += shell/commands
+endif
+ifneq (,$(filter suit%,$(USEMODULE)))
+  DIRS += suit
+endif
+ifneq (,$(filter sys_bus,$(USEMODULE)))
+  DIRS += bus
+endif
+ifneq (,$(filter tcp,$(USEMODULE)))
+  DIRS += net/transport_layer/tcp
+endif
+ifneq (,$(filter test_utils_interactive_sync,$(USEMODULE)))
+  DIRS += test_utils/interactive_sync
+endif
+ifneq (,$(filter udp,$(USEMODULE)))
+  DIRS += net/transport_layer/udp
+endif
+ifneq (,$(filter uhcpc,$(USEMODULE)))
+  DIRS += net/application_layer/uhcp
+endif
+ifneq (,$(filter usbus usbus_%,$(USEMODULE)))
+    DIRS += usb/usbus
+endif
+ifneq (,$(filter ztimer_core,$(USEMODULE)))
+    DIRS += ztimer
+endif
+ifneq (,$(filter ztimer_xtimer_compat,$(USEMODULE)))
+  FILTER += xtimer
 endif
 
-DIRS += $(dir $(wildcard $(addsuffix /Makefile, ${USEMODULE})))
+DIRS += $(dir $(wildcard $(addsuffix /Makefile, $(filter-out $(FILTER), $(USEMODULE)))))
 
 include $(RIOTBASE)/Makefile.base

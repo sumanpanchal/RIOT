@@ -9,22 +9,27 @@
 /**
  * @defgroup unittests Unittests
  * @ingroup  sys
+ * @brief RIOT Unittests based on the EmbUnit Framework
  *
- * @note
- * Please refer to https://github.com/RIOT-OS/RIOT/wiki/Testing-RIOT
+ * @see https://sourceforge.net/projects/embunit
+ *
+ * @note Please refer to https://github.com/RIOT-OS/RIOT/wiki/Testing-RIOT
  *
  * @author Martine Lenders <mlenders@inf.fu-berlin.de>
  */
 
-#ifndef __SYS__EMB_UNIT__H
-#define __SYS__EMB_UNIT__H
+#ifndef EMBUNIT_H
+#define EMBUNIT_H
 
 #include "embUnit/embUnit.h"
+#include "kernel_defines.h"
 
 #ifdef OUTPUT
-#   define OUTPUT_XML      (1)
-#   define OUTPUT_TEXT     (2)
-#   define OUTPUT_COMPILER (4)
+#   define OUTPUT_XML       (1)
+#   define OUTPUT_TEXT      (2)
+#   define OUTPUT_COMPILER  (4)
+#   define OUTPUT_COLORTEXT (8)
+#   define OUTPUT_COLOR     (16)
 
 #   if (OUTPUT==OUTPUT_XML)
 #       include "embUnit/XMLOutputter.h"
@@ -35,6 +40,12 @@
 #   elif (OUTPUT==OUTPUT_COMPILER)
 #       include "embUnit/CompilerOutputter.h"
 #       define OUTPUTTER   (CompilerOutputter_outputter())
+#   elif (OUTPUT==OUTPUT_COLORTEXT)
+#       include "embUnit/ColorTextOutputter.h"
+#       define OUTPUTTER   (ColorTextOutputter_outputter())
+#   elif (OUTPUT==OUTPUT_COLOR)
+#       include "embUnit/ColorOutputter.h"
+#       define OUTPUTTER   (ColorOutputter_outputter())
 #   endif
 
 #   include "embUnit/TextUIRunner.h"
@@ -56,4 +67,4 @@ extern "C" {
 }
 #endif
 
-#endif
+#endif /* EMBUNIT_H */

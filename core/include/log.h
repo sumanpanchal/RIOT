@@ -7,9 +7,10 @@
  */
 
 /**
- * @addtogroup  core_util
+ * @ingroup     core_util
  * @{
  *
+ * @file
  * @brief       System logging header
  *
  * This header offers a bunch of "LOG_*" functions that, with the default
@@ -28,11 +29,11 @@
  * @author      Kaspar Schleiser <kaspar@schleiser.de>
  */
 
-#ifndef __LOG_H
-#define __LOG_H
+#ifndef LOG_H
+#define LOG_H
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /**
@@ -72,10 +73,19 @@ enum {
 /**
  * @brief Log message if level <= LOG_LEVEL
  */
-#define LOG(level, ...) if (level <= LOG_LEVEL) log_write(level, __VA_ARGS__)
+#ifdef __clang__    /* following pragmas required for clang 3.8.0 */
+#define LOG(level, ...) do { \
+        _Pragma("clang diagnostic push") \
+        _Pragma("clang diagnostic ignored \"-Wtautological-compare\"") \
+        if ((level) <= LOG_LEVEL) log_write((level), __VA_ARGS__); } while (0U) \
+        _Pragma("clang diagnostic pop")
+#else
+#define LOG(level, ...) do { \
+        if ((level) <= LOG_LEVEL) log_write((level), __VA_ARGS__); } while (0U)
+#endif /* __clang__ */
 
 /**
- * @brief logging convenience defines
+ * @name Logging convenience defines
  * @{
  */
 #define LOG_ERROR(...) LOG(LOG_ERROR, __VA_ARGS__)
@@ -99,5 +109,5 @@ enum {
 }
 #endif
 
-#endif /* __LOG_H */
+#endif /* LOG_H */
 /** @} */

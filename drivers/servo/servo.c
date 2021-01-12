@@ -8,35 +8,40 @@
  */
 
 /**
- * @ingroup     driver_servo
+ * @ingroup     drivers_servo
  * @{
  *
  * @file
  * @brief       Servo motor driver implementation
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
- * @author      Joakim Gebart <joakim.gebart@eistec.se>
+ * @author      Joakim Nohlgård <joakim.nohlgard@eistec.se>
  *
  * @}
  */
 
 #include "servo.h"
 #include "periph/pwm.h"
-#include "timex.h" /* for SEC_IN_USEC */
+#include "timex.h" /* for US_PER_SEC */
 
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG        0
 #include "debug.h"
 
-#define FREQUENCY       (100U)
-#define RESOLUTION      (SEC_IN_USEC / FREQUENCY)
+#ifndef SERVO_FREQUENCY
+#define SERVO_FREQUENCY     (100U)
+#endif
+
+#ifndef SERVO_RESOLUTION
+#define SERVO_RESOLUTION    (US_PER_SEC / SERVO_FREQUENCY)
+#endif
 
 int servo_init(servo_t *dev, pwm_t pwm, int pwm_channel, unsigned int min, unsigned int max)
 {
     int actual_frequency;
 
-    actual_frequency = pwm_init(dev->device, PWM_LEFT, FREQUENCY, RESOLUTION);
+    actual_frequency = pwm_init(pwm, PWM_LEFT, SERVO_FREQUENCY, SERVO_RESOLUTION);
 
-    DEBUG("servo: requested %d hz, got %d hz\n", FREQUENCY, actual_frequency);
+    DEBUG("servo: requested %d hz, got %d hz\n", SERVO_FREQUENCY, actual_frequency);
 
     if (actual_frequency < 0) {
         /* PWM error */
@@ -78,12 +83,12 @@ int servo_init(servo_t *dev, pwm_t pwm, int pwm_channel, unsigned int min, unsig
      * to actual hardware ticks.
      */
     dev->scale_nom = actual_frequency;
-    dev->scale_den = FREQUENCY;
+    dev->scale_den = SERVO_FREQUENCY;
 
     return 0;
 }
 
-int servo_set(servo_t *dev, unsigned int pos)
+void servo_set(const servo_t *dev, unsigned int pos)
 {
     unsigned int raw_value;
     if (pos > dev->max) {
@@ -98,5 +103,5 @@ int servo_set(servo_t *dev, unsigned int pos)
 
     DEBUG("servo_set: pos %d -> raw %d\n", pos, raw_value);
 
-    return pwm_set(dev->device, dev->channel, raw_value);
+    pwm_set(dev->device, dev->channel, raw_value);
 }

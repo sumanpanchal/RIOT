@@ -32,8 +32,8 @@
  *
  * $Id: AssertImpl.h,v 1.6 2003/09/16 11:09:53 arms22 Exp $
  */
-#ifndef __ASSERTIMPL_H__
-#define __ASSERTIMPL_H__
+#ifndef EMBUNIT_ASSERTIMPL_H
+#define EMBUNIT_ASSERTIMPL_H
 
 #ifdef  __cplusplus
 extern "C" {
@@ -46,10 +46,10 @@ void assertImplementationCStr(const char *expected,const char *actual, long line
 
 #define TEST_ASSERT_EQUAL_STRING(expected_, actual_) \
     do { \
-        __typeof__(expected_) ____expected__ = expected_; \
-        __typeof__(actual_) ____actual__ = actual_; \
+        const char *____expected__ = expected_; \
+        const char *____actual__ = actual_; \
         if (stdimpl_strcmp(____expected__, ____actual__) != 0) { \
-            assertImplementationCStr(____expected__, ____actual__, __LINE__, __FILE__); \
+            assertImplementationCStr(____expected__, ____actual__, __LINE__, RIOT_FILE_RELATIVE); \
             return; \
         } \
     } while (0)
@@ -59,7 +59,8 @@ void assertImplementationCStr(const char *expected,const char *actual, long line
         long long ____expected__ = (long long) (expected_); \
         long long ____actual__ = (long long) (actual_); \
         if (____expected__ != ____actual__) { \
-            assertImplementationLongLong(____expected__, ____actual__, __LINE__, __FILE__); \
+            assertImplementationLongLong(____expected__, ____actual__, \
+                                         __LINE__, RIOT_FILE_RELATIVE); \
             return; \
         } \
     } while (0)
@@ -91,7 +92,7 @@ void assertImplementationCStr(const char *expected,const char *actual, long line
 
 #define TEST_FAIL(message) \
     do { \
-        addFailure((message), __LINE__, __FILE__); \
+        addFailure((message), __LINE__, RIOT_FILE_RELATIVE); \
         return; \
     } while (0)
 
@@ -99,4 +100,4 @@ void assertImplementationCStr(const char *expected,const char *actual, long line
 }
 #endif
 
-#endif/*__ASSERTIMPL_H__*/
+#endif /* EMBUNIT_ASSERTIMPL_H */

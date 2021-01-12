@@ -33,32 +33,12 @@
   .extern  sched_active_thread
   .extern  sched_context_switch_request
   .extern  sched_run
-  .extern  DEBUG_Routine
 
 /* Public functions declared in this file */
   .global  arm_irq_handler
   .global  cpu_switch_context_exit
   .global  task_return
   .global  ctx_switch
-  .global  dINT
-  .global  eINT
-
-.func
-dINT:
-    mrs     r0,  cpsr
-
-    orr     r0, r0, #NOINT              /* Disable Int */
-    msr     CPSR_c, r0
-    mov     pc,lr
-.endfunc
-
-.func
-eINT:
-    mrs     r0,  cpsr
-    and     r0, r0, #~NOINT              /* Enable Int */
-    msr     CPSR_c, r0
-    mov     pc,lr
-.endfunc
 
 ctx_switch:
     /* Save return address on stack */
@@ -144,15 +124,10 @@ arm_irq_handler:
     MRS R1, CPSR
     MSR SPSR, R1
 
-.if (CPU != mc1322x)
     /* jump into vic interrupt */
     mov    r0, #0xffffff00    /* lpc23xx */
     ldr    r0, [r0]
     add    lr,pc,#4
-.else
-    /* mc1322x seems to lack a VIC, distinction of IRQ has to be done in SW */
-    ldr    r0, =isr           /* mc1322x */
-.endif
 
     mov     pc, r0
 

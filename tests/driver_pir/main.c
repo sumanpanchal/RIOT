@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Freie Universität Berlin
+ * Copyright (C) 2018 UC Berkeley
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -13,26 +14,25 @@
  * @file
  * @brief       Test application for the PIR motion sensor driver
  *
- * @author      Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
+ * @author      Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
+ * @author      Hyung-Sin Kim <hs.kim@cs.berkeley.edu>
  *
  * @}
  */
 
-#ifndef PIR_GPIO
-#error "PIR_GPIO not defined"
-#endif
-
 #include <stdio.h>
 
 #include "thread.h"
-#include "vtimer.h"
+#include "xtimer.h"
 #include "pir.h"
+#include "pir_params.h"
 
-char pir_handler_stack[THREAD_STACKSIZE_MAIN];
-pir_t dev;
+static char pir_handler_stack[THREAD_STACKSIZE_MAIN];
+static pir_t dev;
 
 void* pir_handler(void *arg)
 {
+    (void)arg;
     msg_t msg_q[1];
     msg_init_queue(msg_q, 1);
 
@@ -43,10 +43,10 @@ void* pir_handler(void *arg)
     while (msg_receive(&m)) {
         printf("PIR handler got a message: ");
         switch (m.type) {
-            case PIR_STATUS_HI:
+            case PIR_STATUS_ACTIVE:
                 puts("something started moving.");
                 break;
-            case PIR_STATUS_LO:
+            case PIR_STATUS_INACTIVE:
                 puts("the movement has ceased.");
                 break;
             default:
@@ -62,8 +62,8 @@ void* pir_handler(void *arg)
 int main(void)
 {
     puts("PIR motion sensor test application\n");
-    printf("Initializing PIR sensor at GPIO_%i... ", PIR_GPIO);
-    if (pir_init(&dev, PIR_GPIO) == 0) {
+    printf("Initializing PIR sensor at GPIO_%ld... ", (long)PIR_PARAM_GPIO);
+    if (pir_init(&dev, &pir_params[0]) == 0) {
         puts("[OK]\n");
     }
     else {
@@ -74,13 +74,14 @@ int main(void)
 #if TEST_PIR_POLLING
     puts("Printing sensor state every second.");
     while (1) {
-        printf("Status: %s\n", pir_get_status(&dev) == PIR_STATUS_LO ? "lo" : "hi");
-        vtimer_usleep(1000 * 1000);
+        printf("Status: %s\n", pir_get_status(&dev) == PIR_STATUS_INACTIVE ?
+               "inactive" : "active");
+        xtimer_usleep(1000 * 1000);
     }
 #else
    thread_create(
            pir_handler_stack, sizeof(pir_handler_stack), THREAD_PRIORITY_MAIN - 1,
-           CREATE_WOUT_YIELD | CREATE_STACKTEST,
+           THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_STACKTEST,
            pir_handler, NULL, "pir_handler");
 #endif
     return 0;

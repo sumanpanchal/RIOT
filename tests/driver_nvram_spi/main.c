@@ -13,7 +13,7 @@
  * @file
  * @brief       Test application for the SPI NVRAM driver
  *
- * @author      Joakim Gebart <joakim.gebart@eistec.se
+ * @author      Joakim Nohlgård <joakim.nohlgard@eistec.se
  *
  * @}
  */
@@ -23,7 +23,7 @@
 #include <ctype.h>
 
 #include "board.h"
-#include "vtimer.h"
+#include "xtimer.h"
 #include "periph/spi.h"
 #include "nvram-spi.h"
 
@@ -40,16 +40,16 @@
 #error "TEST_NVRAM_SPI_ADDRESS_COUNT not defined"
 #endif
 
-#ifdef TEST_NVRAM_SPI_CONF
-#define SPI_CONF    (TEST_NVRAM_SPI_CONF)
+#ifdef TEST_NVRAM_SPI_MODE
+#define SPI_MODE    (TEST_NVRAM_SPI_MODE)
 #else
-#define SPI_CONF    (SPI_CONF_FIRST_RISING)
+#define SPI_MODE    (SPI_MODE_0)
 #endif
 
 #ifdef TEST_NVRAM_SPI_SPEED
-#define SPI_SPEED   (TEST_NVRAM_SPI_SPEED)
+#define SPI_CLK     (TEST_NVRAM_SPI_SPEED)
 #else
-#define SPI_SPEED   (SPI_SPEED_10MHZ)
+#define SPI_CLK     (SPI_CLK_10MHZ)
 #endif
 
 /* This will only work on small memories. Modify if you need to test NVRAM
@@ -114,24 +114,14 @@ int main(void)
     uint32_t i;
     nvram_spi_params_t spi_params = {
         .spi = TEST_NVRAM_SPI_DEV,
+        .clk = SPI_CLK,
         .cs = TEST_NVRAM_SPI_CS,
         .address_count = TEST_NVRAM_SPI_ADDRESS_COUNT,
     };
     nvram_t dev;
-    timex_t start_delay = {
-        .seconds = 10,
-        .microseconds = 0,
-    };
+    uint32_t start_delay = 10;
 
     puts("NVRAM SPI test application starting...");
-    printf("Initializing SPI_%i... ", TEST_NVRAM_SPI_DEV);
-    if (spi_init_master(TEST_NVRAM_SPI_DEV, SPI_CONF, SPI_SPEED_10MHZ) == 0) {
-        puts("[OK]");
-    }
-    else {
-        puts("[Failed]\n");
-        return 1;
-    }
 
     puts("Initializing NVRAM SPI device descriptor... ");
     if (nvram_spi_init(&dev, &spi_params, TEST_NVRAM_SPI_SIZE) == 0) {
@@ -147,7 +137,7 @@ int main(void)
     puts("!!! This test will erase everything on the NVRAM !!!");
     puts("!!! Unplug/reset/halt device now if this is not acceptable !!!");
     puts("Waiting for 10 seconds before continuing...");
-    vtimer_sleep(start_delay);
+    xtimer_sleep(start_delay);
 
     puts("Reading current memory contents...");
     for (i = 0; i < TEST_NVRAM_SPI_SIZE; ++i) {

@@ -1,327 +1,110 @@
-ifneq (,$(filter libcoap,$(USEPKG)))
-  USEMODULE += pnet
+# include board specific application dependencies
+-include $(APPDIR)/Makefile.board.dep
+
+# include board dependencies
+-include $(BOARDDIR)/Makefile.dep
+
+# include cpu dependencies
+-include $(RIOTCPU)/$(CPU)/Makefile.dep
+
+# include external modules dependencies
+# processed before RIOT ones to be evaluated before the 'default' rules.
+-include $(EXTERNAL_MODULE_DIRS:%=%/Makefile.dep)
+
+# pull dependencies from sys and drivers
+include $(RIOTBASE)/sys/Makefile.dep
+include $(RIOTBASE)/drivers/Makefile.dep
+
+# pull Makefile.dep of each driver modules if they exist
+-include $(sort $(USEMODULE:%=$(RIOTBASE)/drivers/%/Makefile.dep))
+
+# pull dependencies from packages
+-include $(USEPKG:%=$(RIOTPKG)/%/Makefile.dep)
+
+ifneq (,$(filter mpu_stack_guard,$(USEMODULE)))
+  FEATURES_REQUIRED += cortexm_mpu
 endif
 
-ifneq (,$(filter pnet,$(USEMODULE)))
-  USEMODULE += posix
-  USEMODULE += socket_base
-  USEMODULE += net_help
+ifneq (,$(filter mpu_noexec_ram,$(USEMODULE)))
+  FEATURES_REQUIRED += cortexm_mpu
 endif
 
-ifneq (,$(filter transport_layer,$(USEMODULE)))
-  USEMODULE += tcp
-  USEMODULE += udp
-endif
-
-ifneq (,$(filter udp,$(USEMODULE)))
-  USEMODULE += socket_base
-endif
-
-ifneq (,$(filter tcp,$(USEMODULE)))
-  USEMODULE += socket_base
-endif
-
-ifneq (,$(filter socket_base,$(USEMODULE)))
-  USEMODULE += sixlowpan
-  USEMODULE += net_help
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter sixlowborder,$(USEMODULE)))
-  USEMODULE += sixlowpan
-endif
-
-ifneq (,$(filter rpl,$(USEMODULE)))
-  USEMODULE += trickle
-  USEMODULE += routing
-endif
-
-ifneq (,$(filter routing,$(USEMODULE)))
-  USEMODULE += sixlowpan
-endif
-
-ifneq (,$(filter sixlowpan,$(USEMODULE)))
-  USEMODULE += ieee802154
-  USEMODULE += net_help
-  USEMODULE += net_if
-  USEMODULE += posix
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_netif_default,$(USEMODULE)))
-  USEMODULE += ng_netif
-endif
-
-ifneq (,$(filter ng_netif,$(USEMODULE)))
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter ng_nomac,$(USEMODULE)))
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter ng_at86rf2%,$(USEMODULE)))
-  USEMODULE += ng_at86rf2xx
-  USEMODULE += ng_ieee802154
-endif
-
-ifneq (,$(filter kw2xrf,$(USEMODULE)))
-  USEMODULE += ng_ieee802154
-endif
-
-ifneq (,$(filter xbee,$(USEMODULE)))
-  USEMODULE += ng_ieee802154
-endif
-
-ifneq (,$(filter ng_zep,$(USEMODULE)))
-  USEMODULE += hashes
-  USEMODULE += ng_ieee802154
-  USEMODULE += ng_udp
-  USEMODULE += random
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_ieee802154,$(USEMODULE)))
-  ifneq (,$(filter ng_ipv6, $(USEMODULE)))
-    USEMODULE += ng_sixlowpan
-  endif
-  ifneq (,$(filter ng_ipv6_router, $(USEMODULE)))
-    USEMODULE += ng_sixlowpan   # TODO: replace with ng_sixlowpan_router
-  endif
-  ifneq (,$(filter ng_ipv6_default, $(USEMODULE)))
-    USEMODULE += ng_sixlowpan_default
-  endif
-  ifneq (,$(filter ng_ipv6_router_default, $(USEMODULE)))
-    USEMODULE += ng_sixlowpan_default   # TODO: replace with ng_sixlowpan_router_default
-  endif
-endif
-
-ifneq (,$(filter ng_sixlowpan_default,$(USEMODULE)))
-  USEMODULE += ng_ipv6_default
-  USEMODULE += ng_sixlowpan
-  USEMODULE += ng_sixlowpan_frag
-endif
-
-ifneq (,$(filter ng_sixlowpan_frag,$(USEMODULE)))
-  USEMODULE += ng_sixlowpan
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_sixlowpan_iphc,$(USEMODULE)))
-  USEMODULE += ng_sixlowpan
-  USEMODULE += ng_sixlowpan_ctx
-endif
-
-ifneq (,$(filter ng_sixlowpan,$(USEMODULE)))
-  USEMODULE += ng_ipv6
-  USEMODULE += ng_sixlowpan_netif
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter ng_sixlowpan_ctx,$(USEMODULE)))
-  USEMODULE += ng_ipv6_addr
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_ipv6_default,$(USEMODULE)))
-  USEMODULE += ng_ipv6
-  USEMODULE += ng_icmpv6
-  USEMODULE += ng_ndp
-endif
-
-ifneq (,$(filter ng_ipv6_router_default,$(USEMODULE)))
-  USEMODULE += ng_ipv6_router
-  USEMODULE += ng_icmpv6
-  USEMODULE += ng_ndp
-endif
-
-ifneq (,$(filter ng_ndp,$(USEMODULE)))
-  USEMODULE += ng_icmpv6
-  USEMODULE += random
-  USEMODULE += timex
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_icmpv6_echo,$(USEMODULE)))
-  USEMODULE += ng_icmpv6
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter ng_icmpv6,$(USEMODULE)))
-  USEMODULE += ng_inet_csum
-  USEMODULE += ng_ipv6
-endif
-
-ifneq (,$(filter ng_ipv6_hdr,$(USEMODULE)))
-  USEMODULE += ng_inet_csum
-  USEMODULE += ng_pktbuf
-endif
-
-ifneq (,$(filter ng_rpl_srh,$(USEMODULE)))
-  USEMODULE += ng_ipv6_ext_rh
-endif
-
-ifneq (,$(filter ng_ipv6_ext_rh,$(USEMODULE)))
-  USEMODULE += ng_ipv6_ext
-endif
-
-ifneq (,$(filter ng_ipv6_ext,$(USEMODULE)))
-  USEMODULE += ng_ipv6
-endif
-
-ifneq (,$(filter ng_ipv6_router,$(USEMODULE)))
-  USEMODULE += ng_ipv6
-endif
-
-ifneq (,$(filter ng_ipv6,$(USEMODULE)))
-  USEMODULE += ng_inet_csum
-  USEMODULE += ng_ipv6_addr
-  USEMODULE += ng_ipv6_hdr
-  USEMODULE += ng_ipv6_nc
-  USEMODULE += ng_ipv6_netif
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter ng_ipv6_nc,$(USEMODULE)))
-  USEMODULE += ng_ipv6_addr
-endif
-
-ifneq (,$(filter ng_ipv6_netif,$(USEMODULE)))
-  USEMODULE += ng_ipv6_addr
-  USEMODULE += ng_netif
-endif
-
-ifneq (,$(filter ng_udp,$(USEMODULE)))
-  USEMODULE += ng_netbase
-  USEMODULE += ng_inet_csum
-endif
-
-ifneq (,$(filter ng_nettest,$(USEMODULE)))
-  USEMODULE += ng_netapi
-  USEMODULE += ng_netreg
-  USEMODULE += ng_netif
-  USEMODULE += ng_pktbuf
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter ng_netbase,$(USEMODULE)))
-  USEMODULE += ng_netapi
-  USEMODULE += ng_netreg
-  USEMODULE += ng_netif
-  USEMODULE += ng_netif_hdr
-  USEMODULE += ng_pktbuf
-endif
-
-ifneq (,$(filter ng_pktdump,$(USEMODULE)))
-  USEMODULE += ng_pktbuf
-  USEMODULE += od
-endif
-
-ifneq (,$(filter ng_slip,$(USEMODULE)))
-  USEMODULE += ng_netbase
-endif
-
-ifneq (,$(filter aodvv2,$(USEMODULE)))
-  USEMODULE += vtimer
-  USEMODULE += sixlowpan
-  USEMODULE += oonf_common
-  USEMODULE += oonf_rfc5444
-endif
-
-ifneq (,$(filter uart0,$(USEMODULE)))
-  USEMODULE += posix
-endif
-
-ifneq (,$(filter posix,$(USEMODULE)))
-  USEMODULE += timex
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter cbor,$(USEMODULE)))
-  USEMODULE += net_help
-endif
-
-ifneq (,$(filter cc110x%,$(USEMODULE)))
-  USEMODULE += protocol_multiplex
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter cc110x,$(USEMODULE)))
-  USEMODULE += transceiver
-endif
-
-ifneq (,$(filter cc110x_legacy,$(USEMODULE)))
-  USEMODULE += transceiver
-endif
-
-ifneq (,$(filter cc2420,$(USEMODULE)))
-  USEMODULE += transceiver
-  USEMODULE += ieee802154
-endif
-
-ifneq (,$(filter at86rf231,$(USEMODULE)))
-  USEMODULE += netdev_802154
-  USEMODULE += ieee802154
-endif
-
-ifneq (,$(filter l2_ping,$(USEMODULE)))
-  USEMODULE += vtimer
-endif
-
-ifneq (,$(filter vtimer,$(USEMODULE)))
-  USEMODULE += timex
-endif
-
-ifneq (,$(filter net_if,$(USEMODULE)))
-  USEMODULE += transceiver
-  USEMODULE += net_help
-  USEMODULE += hashes
-endif
-
-ifneq (,$(filter ccn_lite,$(USEMODULE)))
-  USEMODULE += crypto
-endif
-
-ifneq (,$(filter netdev_802154,$(USEMODULE)))
-  USEMODULE += netdev_base
-endif
-
-ifneq (,$(filter rgbled,$(USEMODULE)))
-  USEMODULE += color
+ifneq (,$(filter lwip_%,$(USEMODULE)))
+  USEPKG += lwip
 endif
 
 ifneq (,$(filter libfixmath-unittests,$(USEMODULE)))
   USEPKG += libfixmath
+  USEMODULE += libfixmath
 endif
 
-ifneq (,$(filter defaulttransceiver,$(USEMODULE)))
-  FEATURES_REQUIRED += transceiver
+ifneq (,$(filter random,$(USEMODULE)))
+  # select default prng if no prng is selected
+  ifeq (,$(filter prng_%,$(USEMODULE)))
+    USEMODULE += prng_tinymt32
+  endif
 endif
 
-ifneq (,$(filter nhdp,$(USEMODULE)))
-  USEMODULE += vtimer
-  USEMODULE += oonf_common
-  USEMODULE += oonf_rfc5444
+ifneq (,$(filter spiffs,$(USEMODULE)))
+  USEPKG += spiffs
+  USEMODULE += vfs
+  USEMODULE += spiffs_fs
+  USEMODULE += mtd
 endif
 
-ifneq (,$(filter fib,$(USEMODULE)))
-  USEMODULE += timex
-  USEMODULE += vtimer
-  USEMODULE += net_help
+ifneq (,$(filter littlefs,$(USEMODULE)))
+  USEPKG += littlefs
+  USEMODULE += vfs
+  USEMODULE += littlefs_fs
+  USEMODULE += mtd
 endif
 
-ifneq (,$(filter oonf_common,$(USEMODULE)))
-  USEPKG += oonf_api
-  USEMODULE += socket_base
+ifneq (,$(filter littlefs2,$(USEMODULE)))
+  USEPKG += littlefs2
+  USEMODULE += vfs
+  USEMODULE += littlefs2_fs
+  USEMODULE += mtd
 endif
 
-# if any log_* is used, also use LOG pseudomodule
-ifneq (,$(filter log_%,$(USEMODULE)))
-  USEMODULE += log
+ifneq (,$(filter fatfs_vfs,$(USEMODULE)))
+  USEPKG += fatfs
+  USEMODULE += vfs
 endif
 
-ifneq (,$(filter cpp11-compat,$(USEMODULE)))
-  USEMODULE += vtimer
-  USEMODULE += timex
+ifneq (,$(filter nimble_%,$(USEMODULE)))
+  USEPKG += nimble
+endif
+
+ifneq (,$(filter tlsf-malloc,$(USEMODULE)))
+  USEPKG += tlsf
+endif
+
+ifneq (,$(filter tinydtls_sock_dtls, $(USEMODULE)))
+    USEPKG += tinydtls
+endif
+
+# always select gpio (until explicit dependencies are sorted out)
+FEATURES_OPTIONAL += periph_gpio
+
+# always select power management if available
+FEATURES_OPTIONAL += periph_pm
+
+# always select provided architecture features
+FEATURES_REQUIRED += $(filter arch_%,$(FEATURES_PROVIDED))
+
+# always select CPU core features
+FEATURES_REQUIRED += $(filter cpu_core_%,$(FEATURES_PROVIDED))
+
+# don't use idle thread if architecture has needed support
+FEATURES_OPTIONAL += no_idle_thread
+
+ifneq (,$(filter libstdcpp,$(FEATURES_USED)))
+  # Also use C++ if libstdc++ is used
   FEATURES_REQUIRED += cpp
+endif
+
+ifneq (,$(filter test_utils_interactive_sync,$(USEMODULE)))
+  ifneq (,$(filter shell,$(USEMODULE)))
+    DEFAULT_MODULE += test_utils_interactive_sync_shell
+  endif
 endif

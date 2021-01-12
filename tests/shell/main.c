@@ -22,11 +22,33 @@
 #include <string.h>
 
 #include "shell_commands.h"
-#include "posix_io.h"
 #include "shell.h"
-#include "board_uart0.h"
 
-#define SHELL_BUFSIZE   (UART0_BUFSIZE)
+#if MODULE_STDIO_RTT
+#include "xtimer.h"
+#endif
+
+#if MODULE_SHELL_HOOKS
+void shell_post_readline_hook(void)
+{
+    puts("shell_post_readline_hook");
+}
+
+void shell_pre_command_hook(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    puts("shell_pre_command_hook");
+}
+
+void shell_post_command_hook(int ret, int argc, char **argv)
+{
+    (void)ret;
+    (void)argc;
+    (void)argv;
+    puts("shell_post_command_hook");
+}
+#endif
 
 static int print_teststart(int argc, char **argv)
 {
@@ -49,29 +71,24 @@ static int print_testend(int argc, char **argv)
 static int print_echo(int argc, char **argv)
 {
     for (int i = 0; i < argc; ++i) {
-        printf("“%s” ", argv[i]);
+        printf("\"%s\"", argv[i]);
     }
     puts("");
 
     return 0;
 }
 
-static int shell_readc(void)
+static int print_shell_bufsize(int argc, char **argv)
 {
-    char c;
-    int result = posix_read(uart0_handler_pid, &c, 1);
-    if (result != 1) {
-        return -1;
-    }
-    return (unsigned char) c;
-}
+    (void) argc;
+    (void) argv;
+    printf("%d\n", SHELL_DEFAULT_BUFSIZE);
 
-static void shell_putchar(int c)
-{
-    putchar(c);
+    return 0;
 }
 
 static const shell_command_t shell_commands[] = {
+    { "bufsize", "Get the shell's buffer size", print_shell_bufsize },
     { "start_test", "starts a test", print_teststart },
     { "end_test", "ends a test", print_testend },
     { "echo", "prints the input command", print_echo },
@@ -80,24 +97,23 @@ static const shell_command_t shell_commands[] = {
 
 int main(void)
 {
-
     printf("test_shell.\n");
 
-    board_uart0_init();
-
-    posix_open(uart0_handler_pid, 0);
+    /* define buffer to be used by the shell */
+    char line_buf[SHELL_DEFAULT_BUFSIZE];
 
     /* define own shell commands */
-    shell_t shell;
-    shell_init(&shell, shell_commands, SHELL_BUFSIZE, shell_readc,
-               shell_putchar);
-    shell_run(&shell);
+    shell_run_once(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
+
+    puts("shell exited");
+
+    /* Restart the shell after the previous one exits, so that we can test
+     * Ctrl-D exit */
+    shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
     /* or use only system shell commands */
     /*
-    shell_t sys_shell;
-    shell_init(&sys_shell, NULL, SHELL_BUFSIZE, shell_readc, shell_putchar);
-    shell_run(&sys_shell);
+    shell_run(NULL, line_buf, SHELL_DEFAULT_BUFSIZE);
     */
 
     return 0;

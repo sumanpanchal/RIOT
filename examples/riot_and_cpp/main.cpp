@@ -21,14 +21,9 @@
  * @author      DangNhat Pham-Huu <51002279@hcmut.edu.vn>
  */
 
-/*
- * all included headers defining c functions, i.e. all RIOT functions, must be marked as extern "C"
- */
-extern "C" {
 #include "thread.h"
 
 #include "c_functions.h"
-}
 
 #include <cstdio>
 #include <vector>
@@ -49,9 +44,12 @@ int main()
     printf("\n");
 
     /* create thread A */
-    thread_create(threadA_stack, sizeof(threadA_stack), 0, CREATE_WOUT_YIELD, threadA_func, NULL, "thread A");
+    thread_create(threadA_stack, sizeof(threadA_stack), 0,
+                                        THREAD_CREATE_WOUT_YIELD,
+                                        threadA_func, NULL, "thread A");
 
-    printf("******** Hello, you're in thread #%" PRIkernel_pid " ********\n", sched_active_pid);
+    printf("******** Hello, you're in thread #%" PRIkernel_pid " ********\n",
+           thread_getpid());
     printf("We'll test C++ class and methods here!\n");
 
     cpp_class cpp_obj;
@@ -80,13 +78,14 @@ int main()
     return 0;
 }
 
-/* thread A function implemetation */
+/* thread A function implementation */
 void *threadA_func(void *)
 {
     int day = 13, month = 6, year = 2014;
     int ret_day;
 
-    printf("******** Hello, you're in thread #%" PRIkernel_pid " ********\n", sched_active_pid);
+    printf("******** Hello, you're in thread #%" PRIkernel_pid " ********\n",
+           thread_getpid());
     printf("We'll test some C functions here!\n");
 
     printf("\n-= hello function =-\n");

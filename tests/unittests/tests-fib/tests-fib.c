@@ -13,11 +13,19 @@
 #include <errno.h>
 #include "embUnit.h"
 #include "tests-fib.h"
-#include "vtimer.h"
+#include "xtimer.h"
 
 #include "thread.h"
-#include "ng_fib.h"
-#include "ng_fib/ng_universal_address.h"
+#include "net/fib.h"
+#include "universal_address.h"
+
+#define TEST_FIB_TABLE_SIZE (20)
+static fib_entry_t _entries[TEST_FIB_TABLE_SIZE];
+static fib_table_t test_fib_table = { .data.entries = _entries,
+                                      .table_type = FIB_TABLE_TYPE_SH,
+                                      .size = TEST_FIB_TABLE_SIZE,
+                                      .mtx_access = MUTEX_INIT,
+                                      .notify_rp_pos = 0 };
 
 /*
 * @brief helper to fill FIB with unique entries
@@ -27,16 +35,18 @@ static void _fill_FIB_unique(size_t entries)
     size_t add_buf_size = 16;
     char addr_dst[add_buf_size];
     char addr_nxt[add_buf_size];
-    uint32_t addr_dst_flags = 0x77777777;
-    uint32_t addr_nxt_flags = 0x77777777;
+    uint32_t addr_dst_flags = 0x00777777;
+    uint32_t addr_nxt_flags = 0x00777777;
 
     for (size_t i = 0; i < entries; ++i) {
         /* construct "addresses" for the FIB */
         snprintf(addr_dst, add_buf_size, "Test address %02d", (int)i);
-        snprintf(addr_nxt, add_buf_size, "Test address %02d", entries + i);
+        snprintf(addr_nxt, add_buf_size, "Test address %02d", (int)(entries + i));
         /* the terminating \0 is unnecessary here */
-        fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, addr_dst_flags,
-                      (uint8_t *)addr_nxt, add_buf_size - 1, addr_nxt_flags, 10000);
+        fib_add_entry(&test_fib_table, 42,
+                      (uint8_t *)addr_dst, add_buf_size - 1, addr_dst_flags,
+                      (uint8_t *)addr_nxt, add_buf_size - 1, addr_nxt_flags,
+                      10000);
     }
 }
 
@@ -49,16 +59,41 @@ static void _fill_FIB_multiple(size_t entries, size_t modulus)
     size_t add_buf_size = 16;
     char addr_dst[add_buf_size];
     char addr_nxt[add_buf_size];
-    uint32_t addr_dst_flags = 0x33333333;
-    uint32_t addr_nxt_flags = 0x33333333;
+    uint32_t addr_dst_flags = 0x00333333;
+    uint32_t addr_nxt_flags = 0x00333333;
 
     for (size_t i = 0; i < entries; ++i) {
         /* construct "addresses" for the FIB */
         snprintf(addr_dst, add_buf_size, "Test address %02d", (int)i);
-        snprintf(addr_nxt, add_buf_size, "Test address %02d", i % modulus);
-        fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, addr_dst_flags,
-                      (uint8_t *)addr_nxt, add_buf_size - 1, addr_nxt_flags, 10000);
+        snprintf(addr_nxt, add_buf_size, "Test address %02d", (int)(i % modulus));
+        fib_add_entry(&test_fib_table, 42,
+                      (uint8_t *)addr_dst, add_buf_size - 1, addr_dst_flags,
+                      (uint8_t *)addr_nxt, add_buf_size - 1, addr_nxt_flags,
+                      10000);
     }
+}
+
+/*
+* @brief helper to determine the prefix bits
+*/
+static size_t _get_prefix_bits_num(char* addr, size_t addr_len)
+{
+    /* Get the index of the first trailing `0` */
+    int i = 0;
+    for (i = addr_len-1; i > 0; --i) {
+        if (addr[i] != 0) {
+            break;
+        }
+    }
+
+    /* now we check the bits of the lowest byte */
+    uint8_t j = 0;
+    for ( ; j < 8; ++j) {
+        if ((addr[i] >> j) & 0x01) {
+            break;
+        }
+    }
+    return (i << 3) + (8 - j);
 }
 
 /*
@@ -69,14 +104,14 @@ static void test_fib_01_fill_unique_entries(void)
 {
     _fill_FIB_unique(20);
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(40, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -89,14 +124,14 @@ static void test_fib_02_fill_multiple_entries(void)
     _fill_FIB_multiple(entries, 11);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -111,26 +146,26 @@ static void test_fib_03_removing_all_entries(void)
     size_t entries = 20;
     _fill_FIB_unique(entries);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(40, universal_address_get_num_used_entries());
 
     for (size_t i = 0; i < entries; ++i) {
         /* construct "addresses" to remove */
         snprintf(addr_dst, add_buf_size, "Test address %02d", (int)i);
-        fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+        fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
     }
 
-    TEST_ASSERT_EQUAL_INT(0, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(0, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(0, universal_address_get_num_used_entries());
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
 
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -145,24 +180,24 @@ static void test_fib_04_remove_lower_half(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
     for (size_t i = 0; i < entries / 2; ++i) {
         /* construct "addresses" to remove */
         snprintf(addr_dst, add_buf_size, "Test address %02d", (int)i);
-        fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+        fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
     }
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(10, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(10, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(19, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -177,24 +212,25 @@ static void test_fib_05_remove_upper_half(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
     for (size_t i = 0; i < entries / 2; ++i) {
         /* construct "addresses" to remove */
-        snprintf(addr_dst, add_buf_size, "Test address %02d", ((entries / 2) + i));
-        fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+        snprintf(addr_dst, add_buf_size, "Test address %02d", (int)((entries / 2) + i));
+        fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
     }
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(10, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(10, fib_get_num_used_entries(&test_fib_table));
+
     TEST_ASSERT_EQUAL_INT(10, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -211,20 +247,20 @@ static void test_fib_06_remove_one_entry(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst,add_buf_size - 1);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(19, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(19, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -240,23 +276,23 @@ static void test_fib_07_remove_one_entry_multiple_times(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(19, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(19, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(19, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -271,22 +307,22 @@ static void test_fib_08_remove_unknown(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
-    fib_remove_entry((uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst, add_buf_size - 1);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -305,26 +341,29 @@ static void test_fib_09_update_entry(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
-    fib_update_entry((uint8_t *)addr_dst13, add_buf_size - 1,
-                     (uint8_t *)addr_nxt2, add_buf_size - 1, 0x99, 9999);
-    fib_update_entry((uint8_t *)addr_dst07, add_buf_size - 1,
-                     (uint8_t *)addr_nxt77, add_buf_size - 1, 0x77, 7777);
+    fib_update_entry(&test_fib_table, (uint8_t *)addr_dst13,
+                     add_buf_size - 1, (uint8_t *)addr_nxt2, add_buf_size - 1,
+                     0x99, 9999);
+    fib_update_entry(&test_fib_table, (uint8_t *)addr_dst07,
+                     add_buf_size - 1, (uint8_t *)addr_nxt77, add_buf_size - 1,
+                     0x77, 7777);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
 * @brief filling the FIB with entries and adding an additional one (not fitting)
-* It is expected to have 20 FIB entries and to receive FPC_ERROR on adding an additional one
+* It is expected to have 20 FIB entries and to receive FPC_ERROR on adding an
+* additional one
 */
 static void test_fib_10_add_exceed(void)
 {
@@ -335,23 +374,24 @@ static void test_fib_10_add_exceed(void)
     size_t entries = 20;
     _fill_FIB_unique(entries);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(40, universal_address_get_num_used_entries());
 
-    int ret = fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x98,
-                            (uint8_t *)addr_nxt, add_buf_size - 1, 0x99, 9999);
+    int ret = fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                            add_buf_size - 1, 0x98, (uint8_t *)addr_nxt,
+                            add_buf_size - 1, 0x99, 9999);
 
     TEST_ASSERT_EQUAL_INT(-ENOMEM, ret);
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(40, universal_address_get_num_used_entries());
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -370,26 +410,26 @@ static void test_fib_11_get_next_hop_success(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
-    int ret = fib_get_next_hop(&iface_id,
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id,
                                (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                                (uint8_t *)addr_dst, add_buf_size - 1, 0x13);
 
     TEST_ASSERT_EQUAL_INT(0, ret);
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
     ret = strncmp(addr_expect, addr_nxt, add_buf_size);
     TEST_ASSERT_EQUAL_INT(0, ret);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -406,25 +446,25 @@ static void test_fib_12_get_next_hop_fail(void)
 
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
-    int ret = fib_get_next_hop(&iface_id,
-                               (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id, (uint8_t *)addr_nxt,
+                               &add_buf_size, &next_hop_flags,
                                (uint8_t *)addr_dst, add_buf_size - 1, 0x99);
 
     TEST_ASSERT_EQUAL_INT(-EHOSTUNREACH, ret);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
-* @brief get next hop for known destination but unsufficient size for the output
+* @brief get next hop for known destination but insufficient size for the output
 * It is expected to get no next hop and receive -ENOBUFS
 */
 static void test_fib_13_get_next_hop_fail_on_buffer_size(void)
@@ -438,23 +478,23 @@ static void test_fib_13_get_next_hop_fail_on_buffer_size(void)
 
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
-    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries());
+    TEST_ASSERT_EQUAL_INT(20, fib_get_num_used_entries(&test_fib_table));
     TEST_ASSERT_EQUAL_INT(20, universal_address_get_num_used_entries());
 
-    int ret = fib_get_next_hop(&iface_id,
-                               (uint8_t *)addr_nxt, &add_buf_size_nxt, &next_hop_flags,
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id, (uint8_t *)addr_nxt,
+                               &add_buf_size_nxt, &next_hop_flags,
                                (uint8_t *)addr_dst, add_buf_size - 1, 0x13);
 
     TEST_ASSERT_EQUAL_INT(-ENOBUFS, ret);
     TEST_ASSERT_EQUAL_INT(add_buf_size_nxt, add_buf_size - 1);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -475,23 +515,35 @@ static void test_fib_14_exact_and_prefix_match(void)
 
     snprintf(addr_dst, add_buf_size, "Test addr12");
     snprintf(addr_nxt, add_buf_size, "Test address %02d", 12);
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x12,
-                  (uint8_t *)addr_nxt, add_buf_size - 1, 0x12, 100000);
+
+    /* get the prefix in bits */
+    uint32_t prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x12),
+                  (uint8_t *)addr_nxt, add_buf_size - 1,
+                  0x12, 100000);
 
     snprintf(addr_dst, add_buf_size, "Test addr123");
     snprintf(addr_nxt, add_buf_size, "Test address %02d", 23);
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x123,
-                  (uint8_t *)addr_nxt, add_buf_size - 1, 0x23, 100000);
+    prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size - 1,
+                  0x23, 100000);
 
     snprintf(addr_dst, add_buf_size, "Test addr1234");
     snprintf(addr_nxt, add_buf_size, "Test address %02d", 34);
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x1234,
-                  (uint8_t *)addr_nxt, add_buf_size - 1, 0x34, 100000);
+    prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x1234),
+                  (uint8_t *)addr_nxt, add_buf_size - 1,
+                  0x34, 100000);
 
     memset(addr_lookup, 0, add_buf_size);
     /* exact match */
     snprintf(addr_lookup, add_buf_size, "Test addr123");
-    int ret = fib_get_next_hop(&iface_id,
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id,
                                (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                                (uint8_t *)addr_lookup, add_buf_size - 1, 0x123);
 
@@ -507,12 +559,11 @@ static void test_fib_14_exact_and_prefix_match(void)
     memset(addr_nxt, 0, add_buf_size);
     memset(addr_lookup, 0, add_buf_size);
 
-    /* cppcheck: addr_lookup is only passed but not required to be read,
-    *            since we test prefix matching
-    */
-    /* cppcheck-suppress redundantCopy */
+    /* cppcheck-suppress redundantCopy
+     * (reason: addr_lookup is only passed but not required to be read,
+     *  since we test prefix matching) */
     snprintf(addr_lookup, add_buf_size, "Test addr124");
-    ret = fib_get_next_hop(&iface_id,
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
                            (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                            (uint8_t *)addr_lookup, add_buf_size - 1, 0x124);
 
@@ -524,17 +575,17 @@ static void test_fib_14_exact_and_prefix_match(void)
     TEST_ASSERT_EQUAL_INT(0, ret);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 static void test_fib_15_get_lifetime(void)
 {
-    timex_t lifetime, now;
+    uint64_t lifetime, now;
     kernel_pid_t iface_id = 1;
     char addr_dst[] = "Test address151";
     char addr_nxt[] = "Test address152";
@@ -542,21 +593,25 @@ static void test_fib_15_get_lifetime(void)
     uint32_t addr_dst_flags = 0x77777777;
     uint32_t addr_nxt_flags = 0x77777777;
 
-    TEST_ASSERT_EQUAL_INT(0, fib_add_entry(iface_id, (uint8_t *)addr_dst, add_buf_size - 1,
+    TEST_ASSERT_EQUAL_INT(0, fib_add_entry(&test_fib_table,
+                          iface_id, (uint8_t *)addr_dst, add_buf_size - 1,
                           addr_dst_flags, (uint8_t *)addr_nxt, add_buf_size - 1,
                           addr_nxt_flags, 1000));
 
-    TEST_ASSERT_EQUAL_INT(0, fib_devel_get_lifetime(&lifetime, (uint8_t *)addr_dst, add_buf_size - 1));
+    TEST_ASSERT_EQUAL_INT(0, fib_devel_get_lifetime(&test_fib_table, &lifetime,
+                                                    (uint8_t *)addr_dst,
+                                                    add_buf_size - 1));
 
     /* assuming some ms passed during these operations... */
-    vtimer_now(&now);
-    timex_t cmp_lifetime = timex_add(now, timex_set(0, 900000));
-    timex_t cmp_max_lifetime = timex_add(now, timex_set(1,1));
-    TEST_ASSERT_EQUAL_INT(1, timex_cmp(lifetime, cmp_lifetime));
-    /* make sure lifetime hasn't grown magically either */
-    TEST_ASSERT_EQUAL_INT(-1, timex_cmp(lifetime, cmp_max_lifetime));
+    now = xtimer_now_usec64();
+    uint64_t cmp_lifetime = now + 900000lU;
+    uint64_t cmp_max_lifetime = now + 1100000lU;
 
-    fib_deinit();
+    TEST_ASSERT_EQUAL_INT(1, (lifetime > cmp_lifetime));
+    /* make sure lifetime hasn't grown magically either */
+    TEST_ASSERT_EQUAL_INT(1, (lifetime < cmp_max_lifetime));
+
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -584,16 +639,22 @@ static void test_fib_16_prefix_match(void)
     addr_dst[14] = (char)0x80;    /* 1000 0000 */
     addr_lookup[14] = (char)0x87; /* 1000 0111 */
 
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x123,
-                  (uint8_t *)addr_nxt, add_buf_size - 1, 0x23, 100000);
+    uint32_t prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size - 1,
+                  0x23, 100000);
 
     addr_dst[14] = (char)0x3c;    /* 0011 1100 */
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x123,
-                  (uint8_t *)addr_nxt, add_buf_size - 1, 0x23, 100000);
+    prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size - 1,
+                  0x23, 100000);
 
     memset(addr_nxt, 0, add_buf_size);
 
-    int ret = fib_get_next_hop(&iface_id,
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id,
                              (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                              (uint8_t *)addr_lookup, add_buf_size - 1, 0x123);
 
@@ -602,14 +663,18 @@ static void test_fib_16_prefix_match(void)
     /* test fail */
     addr_dst[14] = (char)0x3c;    /* 0011 1100 */
     addr_lookup[14] = (char)0x34; /* 0011 0100 */
+    addr_lookup[13] += 1;
     add_buf_size = 16;
+    prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
 
-    fib_add_entry(42, (uint8_t *)addr_dst, add_buf_size - 1, 0x123,
-                (uint8_t *)addr_nxt, add_buf_size - 1, 0x23, 100000);
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size - 1, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size -
+                  1, 0x23, 100000);
 
     memset(addr_nxt, 0, add_buf_size);
 
-    ret = fib_get_next_hop(&iface_id,
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
                              (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                              (uint8_t *)addr_lookup, add_buf_size - 1, 0x123);
 
@@ -617,23 +682,24 @@ static void test_fib_16_prefix_match(void)
 
     /* test success (again) by adjusting the lsb */
     addr_lookup[14] = (char)0x3e; /* 0011 1110 */
+    addr_lookup[13] -= 1;
     add_buf_size = 16;
 
     memset(addr_nxt, 0, add_buf_size);
 
-    ret = fib_get_next_hop(&iface_id,
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
                              (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                              (uint8_t *)addr_lookup, add_buf_size - 1, 0x123);
 
     TEST_ASSERT_EQUAL_INT(0, ret);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 
@@ -642,7 +708,8 @@ static void test_fib_16_prefix_match(void)
 */
 static void test_fib_17_get_entry_set(void)
 {
-    size_t addr_buf_size = 16;
+    /* FIXME: init as enum to fix folding-constant compiler error on OS X */
+    enum { addr_buf_size = 16 };
     char addr_dst[addr_buf_size];
     char addr_nxt[addr_buf_size];
 
@@ -650,8 +717,9 @@ static void test_fib_17_get_entry_set(void)
     for (size_t i = 0; i < 20; ++i) {
         /* construct "addresses" for the FIB */
         snprintf(addr_dst, addr_buf_size, "Test address %02d", (int)i);
-        snprintf(addr_nxt, addr_buf_size, "Test address %02d", i % 11);
-        fib_add_entry(42, (uint8_t *)addr_dst, addr_buf_size - 1, 0x0,
+        snprintf(addr_nxt, addr_buf_size, "Test address %02d", (int)(i % 11));
+        fib_add_entry(&test_fib_table, 42,
+                      (uint8_t *)addr_dst, addr_buf_size - 1, 0x0,
                       (uint8_t *)addr_nxt, addr_buf_size - 1, 0x0, 100000);
     }
 
@@ -659,9 +727,13 @@ static void test_fib_17_get_entry_set(void)
     fib_destination_set_entry_t arr_dst[arr_size];
     char prefix[addr_buf_size];
     memset(prefix,0, addr_buf_size);
+    /* cppcheck-suppress redundantCopy
+     * (reason: prefix is set to all 0 before adding an address) */
     snprintf(prefix, addr_buf_size, "Test address 1");
 
-    int ret = fib_get_destination_set((uint8_t *)prefix, addr_buf_size-1, &arr_dst[0], &arr_size);
+    int ret = fib_get_destination_set(&test_fib_table,
+                                      (uint8_t *)prefix, addr_buf_size-1,
+                                      &arr_dst[0], &arr_size);
     TEST_ASSERT_EQUAL_INT(0, ret);
 
     /* we should receive 10 entries 10 to 19 */
@@ -669,19 +741,27 @@ static void test_fib_17_get_entry_set(void)
     arr_size = 20;
 
     memset(prefix,0, addr_buf_size);
+    /* cppcheck-suppress redundantCopy
+     * (reason: prefix is set to all 0 before adding an address) */
     snprintf(prefix, addr_buf_size, "Test address 0");
 
-    ret = fib_get_destination_set((uint8_t *)prefix, addr_buf_size-1, &arr_dst[0], &arr_size);
+    ret = fib_get_destination_set(&test_fib_table,
+                                  (uint8_t *)prefix, addr_buf_size - 1,
+                                  &arr_dst[0], &arr_size);
     TEST_ASSERT_EQUAL_INT(0, ret);
 
     /* we should receive 20 entries 0-19 */
     TEST_ASSERT_EQUAL_INT(20, arr_size);
     arr_size = 20;
 
-    memset(prefix,0, addr_buf_size);
+    memset(prefix, 0, addr_buf_size);
+    /* cppcheck-suppress redundantCopy
+     * (reason: prefix is set to all 0 before adding an address) */
     snprintf(prefix, addr_buf_size, "Test address");
 
-    ret = fib_get_destination_set((uint8_t *)prefix, addr_buf_size-1, &arr_dst[0], &arr_size);
+    ret = fib_get_destination_set(&test_fib_table,
+                                  (uint8_t *)prefix, addr_buf_size - 1,
+                                  &arr_dst[0], &arr_size);
     TEST_ASSERT_EQUAL_INT(0, ret);
 
     /* we should receive 20 entries 0-19 */
@@ -697,7 +777,7 @@ static void test_fib_17_get_entry_set(void)
     }
 #endif
 
-    fib_deinit();
+    fib_deinit(&test_fib_table);
 }
 
 /*
@@ -716,12 +796,12 @@ static void test_fib_18_get_next_hop_invalid_parameters(void)
     size_t entries = 20;
     _fill_FIB_multiple(entries, 11);
 
-    int ret = fib_get_next_hop(NULL, NULL, NULL, NULL,NULL,
-                               add_buf_size - 1, 0x13);
+    int ret = fib_get_next_hop(&test_fib_table, NULL, NULL,
+                               NULL, NULL,NULL, add_buf_size - 1, 0x13);
 
     TEST_ASSERT_EQUAL_INT(-EINVAL, ret);
 
-    ret = fib_get_next_hop(&iface_id,
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
                            (uint8_t *)addr_nxt, &add_buf_size, &next_hop_flags,
                            (uint8_t *)addr_dst, add_buf_size - 1, 0x13);
 
@@ -731,17 +811,174 @@ static void test_fib_18_get_next_hop_invalid_parameters(void)
     TEST_ASSERT_EQUAL_INT(0, ret);
 
 #if (TEST_FIB_SHOW_OUTPUT == 1)
-    fib_print_fib_table();
+    fib_print_fib_table(&test_fib_table);
     puts("");
     universal_address_print_table();
     puts("");
 #endif
-    fib_deinit();
+    fib_deinit(&test_fib_table);
+}
+
+/*
+* @brief testing default gateway address
+*/
+static void test_fib_19_default_gateway(void)
+{
+    size_t add_buf_size = 16;
+    char addr_dst[add_buf_size];
+    char addr_nxt_hop[add_buf_size];
+    char addr_nxt[add_buf_size];
+    char addr_lookup[add_buf_size];
+    kernel_pid_t iface_id = KERNEL_PID_UNDEF;
+    uint32_t next_hop_flags = 0;
+
+    memset(addr_dst, 0, add_buf_size);
+    memset(addr_nxt, 0, add_buf_size);
+    memset(addr_nxt_hop, 0, add_buf_size);
+    memset(addr_lookup, 0, add_buf_size);
+
+    snprintf(addr_lookup, add_buf_size, "Some address X1");
+
+    /* set the bytes to 0x01..0x10 of the next-hop */
+    for(size_t i = 0; i < add_buf_size; i++) {
+        addr_nxt[i] = i+1;
+    }
+
+    /* add a default gateway entry */
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size, 0x123,
+                  (uint8_t *)addr_nxt, add_buf_size, 0x23,
+                  100000);
+
+    /* check if it matches all */
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id,
+                               (uint8_t *)addr_nxt_hop, &add_buf_size,
+                               &next_hop_flags, (uint8_t *)addr_lookup,
+                               add_buf_size, 0x123);
+
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(addr_nxt, addr_nxt_hop, add_buf_size));
+
+    memset(addr_nxt_hop, 0, add_buf_size);
+
+    /* set the bytes to 0x02..0x11 of the new next-hop for the default gateway */
+    for(size_t i = 0; i < add_buf_size; ++i) {
+        addr_nxt[i] = i+2;
+    }
+
+    /* change the default gateway entry */
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size, 0x123, (uint8_t *)addr_nxt, add_buf_size, 0x24,
+                  100000);
+
+    /* and check again if it matches all */
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
+                           (uint8_t *)addr_nxt_hop, &add_buf_size, &next_hop_flags,
+                           (uint8_t *)addr_lookup, add_buf_size, 0x123);
+
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(addr_nxt, addr_nxt_hop, add_buf_size));
+
+#if (TEST_FIB_SHOW_OUTPUT == 1)
+    fib_print_fib_table(&test_fib_table);
+    puts("");
+    universal_address_print_table();
+    puts("");
+#endif
+    fib_deinit(&test_fib_table);
+}
+
+/*
+* @brief testing prefix entry changing
+*/
+static void test_fib_20_replace_prefix(void)
+{
+    size_t add_buf_size = 16;
+    char addr_dst[add_buf_size];
+    char addr_nxt_hop[add_buf_size];
+    char addr_nxt[add_buf_size];
+    char addr_lookup[add_buf_size];
+    kernel_pid_t iface_id = KERNEL_PID_UNDEF;
+    uint32_t next_hop_flags = 0;
+
+    memset(addr_dst, 0, add_buf_size);
+    memset(addr_nxt, 0, add_buf_size);
+    memset(addr_nxt_hop, 0, add_buf_size);
+    memset(addr_lookup, 0, add_buf_size);
+
+    /* set the bytes to 0x01..0x10 of the next-hop */
+    for(size_t i = 0; i < add_buf_size; i++) {
+        addr_nxt[i] = i+1;
+    }
+
+    /* set the bytes to 0x01..0x08 of the destination prefix */
+    for(size_t i = 0; i < add_buf_size/2; i++) {
+        addr_dst[i] = i+1;
+    }
+
+    /* set the bytes to 0x01..0x0e of the lookup address */
+    for(size_t i = 0; i < 14; i++) {
+        addr_lookup[i] = i+1;
+    }
+
+    uint32_t prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    /* add a prefix entry */
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size, 0x23,
+                  100000);
+
+    /* check if it matches */
+    int ret = fib_get_next_hop(&test_fib_table, &iface_id,
+                               (uint8_t *)addr_nxt_hop, &add_buf_size,
+                               &next_hop_flags, (uint8_t *)addr_lookup,
+                               add_buf_size, 0x123);
+
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(addr_nxt, addr_nxt_hop, add_buf_size));
+
+    fib_remove_entry(&test_fib_table, (uint8_t *)addr_dst,
+                     add_buf_size);
+
+    memset(addr_nxt_hop, 0, add_buf_size);
+
+    /* set the bytes to 0x02..0x11 of the new next-hop */
+    for(size_t i = 0; i < add_buf_size; ++i) {
+        addr_nxt[i] = i+2;
+    }
+
+    /* set the bytes to 0x01..0x0d of the new destination prefix */
+    for(size_t i = 0; i < 13; i++) {
+        addr_dst[i] = i+1;
+    }
+
+    prefix_len = _get_prefix_bits_num(addr_dst, strlen(addr_dst));
+    /* change the prefix entry */
+    fib_add_entry(&test_fib_table, 42, (uint8_t *)addr_dst,
+                  add_buf_size, ((prefix_len << FIB_FLAG_NET_PREFIX_SHIFT) | 0x123),
+                  (uint8_t *)addr_nxt, add_buf_size, 0x24,
+                  100000);
+
+    /* and check again if it matches  */
+    ret = fib_get_next_hop(&test_fib_table, &iface_id,
+                           (uint8_t *)addr_nxt_hop, &add_buf_size, &next_hop_flags,
+                           (uint8_t *)addr_lookup, add_buf_size, 0x123);
+
+    TEST_ASSERT_EQUAL_INT(0, ret);
+    TEST_ASSERT_EQUAL_INT(0, memcmp(addr_nxt, addr_nxt_hop, add_buf_size));
+
+#if (TEST_FIB_SHOW_OUTPUT == 1)
+    fib_print_fib_table(&test_fib_table);
+    puts("");
+    universal_address_print_table();
+    puts("");
+#endif
+    fib_deinit(&test_fib_table);
 }
 
 Test *tests_fib_tests(void)
 {
-    fib_init();
+    fib_init(&test_fib_table);
     EMB_UNIT_TESTFIXTURES(fixtures) {
         new_TestFixture(test_fib_01_fill_unique_entries),
                         new_TestFixture(test_fib_02_fill_multiple_entries),
@@ -761,6 +998,8 @@ Test *tests_fib_tests(void)
                         new_TestFixture(test_fib_16_prefix_match),
                         new_TestFixture(test_fib_17_get_entry_set),
                         new_TestFixture(test_fib_18_get_next_hop_invalid_parameters),
+                        new_TestFixture(test_fib_19_default_gateway),
+                        new_TestFixture(test_fib_20_replace_prefix),
     };
 
     EMB_UNIT_TESTCALLER(fib_tests, NULL, NULL, fixtures);

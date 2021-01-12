@@ -1,20 +1,20 @@
 /**
  * Native CPU configuration
  *
- * Copyright (C) 2013 Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
+ * Copyright (C) 2013 Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
  * directory for more details.
  *
- * @ingroup arch
+ * @ingroup cpu_native
  * @{
  * @file
- * @author  Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
+ * @author  Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
  * @}
  */
-#ifndef CPUCONF_H_
-#define CPUCONF_H_
+#ifndef CPU_CONF_H
+#define CPU_CONF_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,46 +30,24 @@ extern "C" {
 #ifdef __MACH__ /* OSX */
 #define THREAD_STACKSIZE_DEFAULT            (163840)
 #define THREAD_STACKSIZE_IDLE               (163840)
-#define THREAD_EXTRA_STACKSIZE_PRINTF       (163840)
-#define THREAD_EXTRA_STACKSIZE_PRINTF_FLOAT (163840)
+#define THREAD_EXTRA_STACKSIZE_PRINTF       (81920)
+#define THREAD_EXTRA_STACKSIZE_PRINTF_FLOAT (81920)
 /* for core/include/thread.h */
 #define THREAD_STACKSIZE_MINIMUM            (163840)
-/* undefine the TRANSCEIVER_STACK_SIZE (2048 or 512) defined in transceiver.h */
-#ifdef TRANSCEIVER_STACK_SIZE
-#undef TRANSCEIVER_STACK_SIZE
-#endif
-#define TRANSCEIVER_STACK_SIZE              (163840)
 /* native internal */
 #define THREAD_STACKSIZE_MINIMUM            (163840)
-#define NATIVE_ISR_STACKSIZE                (163840)
+#define ISR_STACKSIZE                       (163840)
 
 #else /* Linux etc. */
 #define THREAD_STACKSIZE_DEFAULT            (8192)
 #define THREAD_STACKSIZE_IDLE               (8192)
-#define THREAD_EXTRA_STACKSIZE_PRINTF       (8192)
-#define THREAD_EXTRA_STACKSIZE_PRINTF_FLOAT (8192)
+#define THREAD_EXTRA_STACKSIZE_PRINTF       (4096)
+#define THREAD_EXTRA_STACKSIZE_PRINTF_FLOAT (4096)
 /* for core/include/thread.h */
 #define THREAD_STACKSIZE_MINIMUM            (8192)
-/* undefine the TRANSCEIVER_STACK_SIZE (2048 or 512) defined in transceiver.h */
-#ifdef TRANSCEIVER_STACK_SIZE
-#undef TRANSCEIVER_STACK_SIZE
-#endif
-#define TRANSCEIVER_STACK_SIZE              (16384)
 /* native internal */
-#define NATIVE_ISR_STACKSIZE                (8192)
+#define ISR_STACKSIZE                       (8192)
 #endif /* OS */
-/** @} */
-
-/**
- * @brief   UART0 buffer size definition for compatibility reasons
- *
- * TODO: remove once the remodeling of the uart0 driver is done
- * @{
- */
-#ifdef UART0_BUFSIZE
-#undef UART0_BUFSIZE
-#endif
-#define UART0_BUFSIZE                       (128)
 /** @} */
 
 /**
@@ -77,15 +55,13 @@ extern "C" {
  */
 #define NATIVE_ETH_PROTO 0x1234
 
-/**
- * @brief   Length of CPU ID for @ref cpu_id_get() in @ref periph/cpuid.h
- */
-#ifndef CPUID_ID_LEN
-#define CPUID_ID_LEN                    (4)
+#if (defined(CONFIG_GNRC_PKTBUF_SIZE)) && (CONFIG_GNRC_PKTBUF_SIZE < 2048)
+#   undef  CONFIG_GNRC_PKTBUF_SIZE
+#   define CONFIG_GNRC_PKTBUF_SIZE     (2048)
 #endif
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CPUCONF_H_ */
+#endif /* CPU_CONF_H */

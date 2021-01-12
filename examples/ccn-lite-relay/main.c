@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Freie Universität Berlin
+ * Copyright (C) 2015 Inria
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -7,79 +7,56 @@
  */
 
 /**
- * @ingroup examples
+ * @ingroup     examples
  * @{
  *
  * @file
- * @brief CCN Lite relay example application
+ * @brief       Basic ccn-lite relay example (produce and consumer via shell)
  *
- * @author Christian Mehlis <mehlis@inf.fu-berlin.de>
+ * @author      Oliver Hahm <oliver.hahm@inria.fr>
  *
  * @}
  */
 
-// system
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <inttypes.h>
 
-// riot
-#include "thread.h"
-#include "periph/rtc.h"
+#include "msg.h"
+#include "shell.h"
+#include "ccn-lite-riot.h"
+#include "net/gnrc/netif.h"
+#include "net/gnrc/pktdump.h"
 
-// ccn
-#include "ccn_lite/ccnl-riot.h"
-
-static kernel_pid_t _relay_pid = KERNEL_PID_UNDEF;
-
-char t2_stack[THREAD_STACKSIZE_MAIN];
-
-void set_address_handler(uint16_t a)
-{
-    msg_t mesg;
-    transceiver_command_t tcmd;
-
-    tcmd.transceivers = TRANSCEIVER;
-    tcmd.data = &a;
-    mesg.content.ptr = (char *) &tcmd;
-
-    printf("trying to set address %" PRIu16 "\n", a);
-    mesg.type = SET_ADDRESS;
-
-    printf("transceiver_pid=%" PRIkernel_pid"\n", transceiver_pid);
-
-    msg_send_receive(&mesg, &mesg, transceiver_pid);
-    printf("got address: %" PRIu16 "\n", a);
-}
-
-void populate_cache(void)
-{
-    msg_t m;
-    m.content.value = 0;
-    m.type = CCNL_RIOT_POPULATE;
-    msg_send(&m, _relay_pid);
-}
-
-void *second_thread(void *arg)
-{
-    (void) arg;
-    set_address_handler(42);
-    populate_cache();
-    return NULL;
-}
+/* main thread's message queue */
+#define MAIN_QUEUE_SIZE     (8)
+static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
 
 int main(void)
 {
-    printf("CCN!\n");
+    msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
 
-    _relay_pid = thread_getpid();
+    puts("Basic CCN-Lite example");
 
-    thread_create(t2_stack, sizeof(t2_stack), THREAD_PRIORITY_MAIN + 1,
-                  CREATE_STACKTEST, second_thread, NULL, "helper thread");
+    ccnl_core_init();
 
-    printf("starting ccn-lite relay...\n");
-    ccnl_riot_relay_start(NULL);
+    ccnl_start();
 
+    /* get the default interface */
+    gnrc_netif_t *netif;
+
+    /* set the relay's PID, configure the interface to use CCN nettype */
+    if (((netif = gnrc_netif_iter(NULL)) == NULL) ||
+        (ccnl_open_netif(netif->pid, GNRC_NETTYPE_CCN) < 0)) {
+        puts("Error registering at network interface!");
+        return -1;
+    }
+
+#ifdef MODULE_NETIF
+    gnrc_netreg_entry_t dump = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL,
+                                                          gnrc_pktdump_pid);
+    gnrc_netreg_register(GNRC_NETTYPE_CCN_CHUNK, &dump);
+#endif
+
+    char line_buf[SHELL_DEFAULT_BUFSIZE];
+    shell_run(NULL, line_buf, SHELL_DEFAULT_BUFSIZE);
     return 0;
 }

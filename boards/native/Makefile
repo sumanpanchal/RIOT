@@ -1,7 +1,5 @@
-MODULE =$(BOARD)_base
+MODULE = board
 
 DIRS = drivers
 
 include $(RIOTBASE)/Makefile.base
-
-INCLUDES = $(NATIVEINCLUDES)

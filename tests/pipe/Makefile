@@ -1,7 +1,7 @@
-APPLICATION = pipe
 include ../Makefile.tests_common
 
-BOARD_INSUFFICIENT_RAM := stm32f0discovery
+#malloc.h not found
+BOARD_BLACKLIST := arduino-leonardo mega-xplained
 
 USEMODULE += pipe
 

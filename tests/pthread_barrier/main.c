@@ -23,7 +23,7 @@
 
 #include "pthread.h"
 #include "random.h"
-#include "vtimer.h"
+#include "xtimer.h"
 
 #define NUM_CHILDREN 4
 #define NUM_ITERATIONS 5
@@ -43,9 +43,9 @@ static void *run(void *id_)
         }
         pthread_barrier_wait(&barrier);
 
-        uint32_t timeout_us = genrand_uint32() % 2500000;
-        printf("Child %i sleeps for %8" PRIu32 " µs.\n", id, timeout_us);
-        vtimer_usleep(timeout_us);
+        uint32_t timeout_us = random_uint32() % 2500000;
+        printf("Child %i sleeps for %8" PRIu32 " us.\n", id, timeout_us);
+        xtimer_usleep(timeout_us);
     }
 
     printf("Done %i\n", id);
@@ -54,9 +54,10 @@ static void *run(void *id_)
 
 int main(void)
 {
-    genrand_init(RAND_SEED);
+    random_init(RAND_SEED);
 
-    puts("Start.\n");
+    printf("NUM_CHILDREN: %d, NUM_ITERATIONS: %d\n", NUM_CHILDREN,
+           NUM_ITERATIONS);
     pthread_barrier_init(&barrier, NULL, NUM_CHILDREN);
 
     pthread_t children[NUM_CHILDREN];
@@ -70,6 +71,7 @@ int main(void)
     }
 
     pthread_barrier_destroy(&barrier);
-    puts("\nDone.");
+    puts("");
+    puts("SUCCESS");
     return 0;
 }

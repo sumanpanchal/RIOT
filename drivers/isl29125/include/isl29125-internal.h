@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Ludwig Ortmann
+ * Copyright 2015 Ludwig Knüpfer
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -7,13 +7,13 @@
  */
 
 /**
- * @ingroup     driver_isl29125
+ * @ingroup     drivers_isl29125
  * @{
  *
  * @file
  * @brief       Definitions for the ISL29125 RGB light sensor
  *
- * @author      Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
+ * @author      Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
  */
 
 #ifndef ISL29125_INTERNAL_H
@@ -24,19 +24,19 @@ extern "C" {
 #endif
 
 /**
- * @brief The sensors hard coded I2C address
+ * @brief   The sensors hard coded I2C address
  */
 #define ISL29125_I2C_ADDRESS 0x44
 
 /**
- * @name ISL29125 constants
+ * @name    ISL29125 constants
  * @{
  */
 #define ISL29125_ID             0x7D
 /** @} */
 
 /**
- * @name ISL29125 register map
+ * @name    ISL29125 register map
  * @{
  */
 /* main register */
@@ -63,14 +63,14 @@ extern "C" {
 /** @} */
 
 /**
- * @name ISL29125 commands
+ * @name    ISL29125 commands
  * @{
  */
 #define ISL29125_CMD_RESET      0x46
 /** @} */
 
 /**
- * @name ISL29125 configuration masks and bits
+ * @name    ISL29125 configuration masks and bits
  * @{
  */
 /* ISL29125_REG_CONF1 B2:B0 */

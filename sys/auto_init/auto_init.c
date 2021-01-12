@@ -1,356 +1,273 @@
 /**
  * Auto initialization for used modules
  *
- * Copyright (C) 2013  INRIA.
+ * Copyright (C) 2020 Freie Universität Berlin
+ *               2020 Kaspar Schleiser <kaspar@schleiser.de>
+ *               2013  INRIA.
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
  * directory for more details.
  *
- * @ingroup auto_init
+ * @ingroup sys_auto_init
  * @{
  * @file
  * @brief   initializes any used module that has a trivial init function
  * @author  Oliver Hahm <oliver.hahm@inria.fr>
  * @author  Hauke Petersen <hauke.petersen@fu-berlin.de>
+ * @author  Kaspar Schleiser <kaspar@schleiser.de>
+ * @author  Martine S. Lenders <m.lenders@fu-berlin.de>
  * @}
  */
 #include <stdint.h>
 #include <stdio.h>
 
 #include "auto_init.h"
-
-#ifdef MODULE_CONFIG
-#include "config.h"
-#endif
-
-#ifdef MODULE_SHT11
-#include "sht11.h"
-#endif
-
-#ifdef MODULE_GPIOINT
-#include "gpioint.h"
-#endif
-
-#ifdef MODULE_CC110X_LEGACY_CSMA
-#include "cc110x_legacy_csma.h"
-#endif
-
-#ifdef MODULE_LTC4150
-#include "ltc4150.h"
-#endif
-
-#ifdef MODULE_UART0
-#include "board_uart0.h"
-#endif
-
-#ifdef MODULE_MCI
-#include "diskio.h"
-#endif
-
-#ifdef MODULE_VTIMER
-#include "vtimer.h"
-#endif
-
-#ifdef MODULE_RTC
-#include "periph/rtc.h"
-#endif
-
-#ifdef MODULE_SIXLOWPAN
-#include "sixlowpan.h"
-#endif
-
-#ifdef MODULE_UDP
-#include "udp.h"
-#endif
-
-#ifdef MODULE_TCP
-#include "tcp.h"
-#endif
-
-#ifdef MODULE_NOMAC
-#include "nomac.h"
-#endif
-
-#ifdef MODULE_NET_IF
-#include "cpu_conf.h"
-#include "cpu.h"
-#include "kernel.h"
-#include "net_if.h"
-#include "transceiver.h"
-#include "net_help.h"
-#include "hashes.h"
-#include "periph/cpuid.h"
-#endif
-
-#ifdef MODULE_NG_SIXLOWPAN
-#include "net/ng_sixlowpan.h"
-#endif
-
-#ifdef MODULE_NG_IPV6
-#include "net/ng_ipv6.h"
-#endif
-
-#ifdef MODULE_NG_IPV6_NETIF
-#include "net/ng_ipv6/netif.h"
-#endif
-
-#ifdef MODULE_L2_PING
-#include "l2_ping.h"
-#endif
-
-#ifdef MODULE_NG_PKTDUMP
-#include "net/ng_pktdump.h"
-#endif
-
-#ifdef MODULE_NG_UDP
-#include "net/ng_udp.h"
-#endif
-
-#ifdef MODULE_DEV_ETH_AUTOINIT
-#include "net/dev_eth.h"
-#include "dev_eth_autoinit.h"
-#endif
-
-#ifdef MODULE_FIB
-#include "net/ng_fib.h"
-#endif
-
-#define ENABLE_DEBUG (0)
-#include "debug.h"
-
-#ifndef CONF_RADIO_ADDR
-#define CONF_RADIO_ADDR (1)
-#endif
-
-#ifndef CONF_PAN_ID
-#define CONF_PAN_ID     (0xabcd)
-#endif
-
-#ifdef MODULE_NET_IF
-void auto_init_net_if(void)
-{
-    transceiver_type_t transceivers = 0;
-#ifdef MODULE_AT86RF231
-    transceivers |= TRANSCEIVER_AT86RF231;
-#endif
-#ifdef MODULE_CC1020
-    transceivers |= TRANSCEIVER_CC1020;
-#endif
-#if (defined(MODULE_CC110X) || defined(MODULE_CC110X_LEGACY) || defined(MODULE_CC110X_LEGACY_CSMA))
-    transceivers |= TRANSCEIVER_CC1100;
-#endif
-#ifdef MODULE_CC2420
-    transceivers |= TRANSCEIVER_CC2420;
-#endif
-#ifdef MODULE_MC1322X
-    transceivers |= TRANSCEIVER_MC1322X;
-#endif
-#ifdef MODULE_NATIVENET
-    transceivers |= TRANSCEIVER_NATIVE;
-#endif
-    net_if_init();
-
-    if (transceivers != 0) {
-#if CPUID_ID_LEN && defined(MODULE_HASHES)
-        uint8_t cpuid[CPUID_ID_LEN];
-
-        cpuid_get(cpuid);
-#endif
-        transceiver_init(transceivers);
-        transceiver_start();
-        int iface = net_if_init_interface(0, transceivers);
-
-#if CPUID_ID_LEN && defined(MODULE_HASHES)
-        net_if_eui64_t eui64;
-        uint32_t hash_h = djb2_hash(cpuid, CPUID_ID_LEN / 2);
-#if CPUID_ID_LEN % 2 == 0
-        uint32_t hash_l = djb2_hash(&(cpuid[CPUID_ID_LEN / 2]),
-                                    CPUID_ID_LEN / 2);
-#else /* CPUID_ID_LEN % 2 == 0 */
-        uint32_t hash_l = djb2_hash(&(cpuid[CPUID_ID_LEN / 2]),
-                                    CPUID_ID_LEN / 2 + 1);
-#endif /* CPUID_ID_LEN % 2 == 0 */
-
-        eui64.uint32[1] = hash_l;
-        eui64.uint32[0] = hash_h;
-
-        /* Set Local/Universal bit to Local since this EUI64 is made up. */
-        eui64.uint8[0] |= 0x02;
-        net_if_set_eui64(iface, &eui64);
-
-#if ENABLE_DEBUG
-        DEBUG("Auto init radio long address on interface %d to ", iface);
-
-        for (size_t i = 0; i < 8; i++) {
-            printf("%02x ", eui64.uint8[i]);
-        }
-
-        DEBUG("\n");
-#endif /* ENABLE_DEBUG */
-
-#undef CONF_RADIO_ADDR
-#if (defined(MODULE_CC110X) || defined(MODULE_CC110X_LEGACY) || defined(MODULE_CC110X_LEGACY_CSMA))
-        uint8_t hwaddr = (uint8_t)((hash_l ^ hash_h) ^ ((hash_l ^ hash_h) >> 24));
-        /* do not combine more parts to keep the propability low that it just
-         * becomes 0xff */
-#else
-        uint16_t hwaddr = HTONS((uint16_t)((hash_l ^ hash_h) ^ ((hash_l ^ hash_h) >> 16)));
-#endif
-        net_if_set_hardware_address(iface, hwaddr);
-        DEBUG("Auto init radio address on interface %d to 0x%04x\n", iface, hwaddr);
-#else /* CPUID_ID_LEN && defined(MODULE_HASHES) */
-
-        if (!net_if_get_hardware_address(iface)) {
-            DEBUG("Auto init radio address on interface %d to 0x%04x\n", iface, CONF_RADIO_ADDR);
-            DEBUG("Change this value at compile time with macro CONF_RADIO_ADDR\n");
-            net_if_set_hardware_address(iface, CONF_RADIO_ADDR);
-        }
-
-#endif /* CPUID_ID_LEN && defined(MODULE_HASHES) */
-
-        if (net_if_set_src_address_mode(iface, NET_IF_TRANS_ADDR_M_SHORT)) {
-            DEBUG("Auto init source address mode to short on interface %d\n",
-                  iface);
-        }
-        else {
-            net_if_set_src_address_mode(iface, NET_IF_TRANS_ADDR_M_LONG);
-            DEBUG("Auto init source address mode to long on interface %d\n",
-                  iface);
-        }
-
-
-        if (net_if_get_pan_id(iface) <= 0) {
-            DEBUG("Auto init PAN ID on interface %d to 0x%04x\n", iface, CONF_PAN_ID);
-            DEBUG("Change this value at compile time with macro CONF_PAN_ID\n");
-            net_if_set_pan_id(iface, CONF_PAN_ID);
-        }
-
-        if (iface >= 0) {
-            DEBUG("Auto init interface %d\n", iface);
-        }
-    }
-}
-#endif /* MODULE_NET_IF */
+#include "kernel_defines.h"
+#include "log.h"
 
 void auto_init(void)
 {
-#ifdef MODULE_CONFIG
-    DEBUG("Auto init loading config\n");
-    config_load();
-#endif
+    if (IS_USED(MODULE_AUTO_INIT_RANDOM)) {
+        LOG_DEBUG("Auto init random.\n");
+        extern void auto_init_random(void);
+        auto_init_random();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_ZTIMER)) {
+        LOG_DEBUG("Auto init ztimer.\n");
+        void ztimer_init(void);
+        ztimer_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_XTIMER) &&
+            !IS_USED(MODULE_ZTIMER_XTIMER_COMPAT)) {
+        LOG_DEBUG("Auto init xtimer.\n");
+        extern void xtimer_init(void);
+        xtimer_init();
+    }
+    if (IS_USED(MODULE_SCHEDSTATISTICS)) {
+        LOG_DEBUG("Auto init schedstatistics.\n");
+        extern void init_schedstatistics(void);
+        init_schedstatistics();
+    }
+    if (IS_USED(MODULE_DUMMY_THREAD)) {
+        extern void dummy_thread_create(void);
+        dummy_thread_create();
+    }
+    if (IS_USED(MODULE_EVENT_THREAD)) {
+        LOG_DEBUG("Auto init event threads.\n");
+        extern void auto_init_event_thread(void);
+        auto_init_event_thread();
+    }
+    if (IS_USED(MODULE_SYS_BUS)) {
+        LOG_DEBUG("Auto init system buses.\n");
+        extern void auto_init_sys_bus(void);
+        auto_init_sys_bus();
+    }
+    if (IS_USED(MODULE_MCI)) {
+        LOG_DEBUG("Auto init mci.\n");
+        extern void mci_initialize(void);
+        mci_initialize();
+    }
+    if (IS_USED(MODULE_PROFILING)) {
+        LOG_DEBUG("Auto init profiling.\n");
+        extern void profiling_init(void);
+        profiling_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_PKTBUF)) {
+        LOG_DEBUG("Auto init gnrc_pktbuf.\n");
+        extern void gnrc_pktbuf_init(void);
+        gnrc_pktbuf_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_PKTDUMP)) {
+        LOG_DEBUG("Auto init gnrc_pktdump.\n");
+        extern void gnrc_pktdump_init(void);
+        gnrc_pktdump_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_SIXLOWPAN)) {
+        LOG_DEBUG("Auto init gnrc_sixlowpan.\n");
+        extern void gnrc_sixlowpan_init(void);
+        gnrc_sixlowpan_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_IPV6)) {
+        LOG_DEBUG("Auto init gnrc_ipv6.\n");
+        extern void gnrc_ipv6_init(void);
+        gnrc_ipv6_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_UDP)) {
+        LOG_DEBUG("Auto init gnrc_udp.\n");
+        extern void gnrc_udp_init(void);
+        gnrc_udp_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_TCP)) {
+        LOG_DEBUG("Auto init gnrc_tcp.\n");
+        extern void gnrc_tcp_init(void);
+        gnrc_tcp_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_LWIP)) {
+        LOG_DEBUG("Bootstraping lwIP.\n");
+        extern void lwip_bootstrap(void);
+        lwip_bootstrap();
+    }
+    if (IS_USED(MODULE_OPENTHREAD)) {
+        LOG_DEBUG("Bootstrapping openthread.\n");
+        extern void openthread_bootstrap(void);
+        openthread_bootstrap();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_OPENWSN)) {
+        LOG_DEBUG("Bootstrapping openwsn.\n");
+        extern void openwsn_bootstrap(void);
+        openwsn_bootstrap();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_UWB_CORE)) {
+        LOG_DEBUG("Bootstrapping uwb core.\n");
+        extern void uwb_core_init(void);
+        uwb_core_init();
+    }
+    if (IS_USED(MODULE_GCOAP) &&
+        !IS_ACTIVE(CONFIG_GCOAP_NO_AUTO_INIT)) {
+        LOG_DEBUG("Auto init gcoap.\n");
+        extern void gcoap_init(void);
+        gcoap_init();
+    }
+    if (IS_USED(MODULE_DEVFS)) {
+        LOG_DEBUG("Mounting /dev.\n");
+        extern void auto_init_devfs(void);
+        auto_init_devfs();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_IPV6_NIB)) {
+        LOG_DEBUG("Auto init gnrc_ipv6_nib.\n");
+        extern void gnrc_ipv6_nib_init(void);
+        gnrc_ipv6_nib_init();
+    }
+    if (IS_USED(MODULE_SKALD)) {
+        LOG_DEBUG("Auto init Skald.\n");
+        extern void skald_init(void);
+        skald_init();
+    }
+    if (IS_USED(MODULE_CORD_COMMON)) {
+        LOG_DEBUG("Auto init cord_common.\n");
+        extern void cord_common_init(void);
+        cord_common_init();
+    }
+    if (IS_USED(MODULE_CORD_EP_STANDALONE)) {
+        LOG_DEBUG("Auto init cord_ep_standalone.\n");
+        extern void cord_ep_standalone_run(void);
+        cord_ep_standalone_run();
+    }
+    if (IS_USED(MODULE_ASYMCUTE)) {
+        LOG_DEBUG("Auto init Asymcute.\n");
+        extern void asymcute_handler_run(void);
+        asymcute_handler_run();
+    }
+    if (IS_USED(MODULE_NIMBLE)) {
+        LOG_DEBUG("Auto init NimBLE.\n");
+        extern void nimble_riot_init(void);
+        nimble_riot_init();
+    }
+    if (IS_USED(MODULE_AUTO_INIT_LORAMAC)) {
+        LOG_DEBUG("Auto init loramac.\n");
+        extern void auto_init_loramac(void);
+        auto_init_loramac();
+    }
+    if (IS_USED(MODULE_SOCK_DTLS)) {
+        LOG_DEBUG("Auto init sock_dtls.\n");
+        extern void sock_dtls_init(void);
+        sock_dtls_init();
+    }
 
-#ifdef MODULE_VTIMER
-    DEBUG("Auto init vtimer module.\n");
-    vtimer_init();
-#endif
-#ifdef MODULE_UART0
-    DEBUG("Auto init uart0 module.\n");
-    board_uart0_init();
-#endif
-#ifdef MODULE_RTC
-    DEBUG("Auto init rtc module.\n");
-    rtc_init();
-#endif
-#ifdef MODULE_SHT11
-    DEBUG("Auto init SHT11 module.\n");
-    sht11_init();
-#endif
-#ifdef MODULE_GPIOINT
-    DEBUG("Auto init gpioint module.\n");
-    gpioint_init();
-#endif
-#ifdef MODULE_CC110X_LEGACY_CSMA
-    DEBUG("Auto init CC1100 module.\n");
-#ifndef MODULE_TRANSCEIVER
-    cc1100_init();
-#endif
-#endif
-#ifdef MODULE_LTC4150
-    DEBUG("Auto init ltc4150 module.\n");
-    ltc4150_init();
-#endif
-#ifdef MODULE_MCI
-    DEBUG("Auto init mci module.\n");
-    MCI_initialize();
-#endif
-#ifdef MODULE_L2_PING
-    DEBUG("Auto init net_if module.\n");
-    l2_ping_init();
-#endif
-#ifdef MODULE_NOMAC
-    DEBUG("Auto init nomac module.\n");
-    nomac_init_module();
-#endif
-#ifdef MODULE_NET_IF
-    DEBUG("Auto init net_if module.\n");
-    auto_init_net_if();
-#endif
-#ifdef MODULE_SIXLOWPAN
-    DEBUG("Auto init 6LoWPAN module.\n");
-    sixlowpan_lowpan_init();
-#endif
-#ifdef MODULE_PROFILING
-    extern void profiling_init(void);
-    profiling_init();
-#endif
-#ifdef MODULE_UDP
-    DEBUG("Auto init transport layer module: [udp].\n");
-    udp_init_transport_layer();
-#endif
+    /* initialize USB devices */
+    if (IS_USED(MODULE_AUTO_INIT_USBUS)) {
+        LOG_DEBUG("Auto init USB.\n");
+        extern void auto_init_usb(void);
+        auto_init_usb();
+    }
 
-#ifdef MODULE_TCP
-    DEBUG("Auto init transport layer module: [tcp].\n");
-    tcp_init_transport_layer();
-#endif
-#ifdef MODULE_NG_PKTDUMP
-    DEBUG("Auto init ng_pktdump module.\n");
-    ng_pktdump_init();
-#endif
-#ifdef MODULE_NG_SIXLOWPAN
-    DEBUG("Auto init ng_sixlowpan module.\n");
-    ng_sixlowpan_init();
-#endif
-#ifdef MODULE_NG_IPV6
-    DEBUG("Auto init ng_ipv6 module.\n");
-    ng_ipv6_init();
-#endif
-#ifdef MODULE_NG_UDP
-    DEBUG("Auto init UDP module.\n");
-    ng_udp_init();
-#endif
-#ifdef MODULE_FIB
-    DEBUG("Auto init FIB module.\n");
-    fib_init();
-#endif
+    /* initialize network devices */
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_NETIF)) {
+        LOG_DEBUG("Auto init gnrc_netif.\n");
+        extern void gnrc_netif_init_devs(void);
+        gnrc_netif_init_devs();
+    }
 
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_UHCPC)) {
+        LOG_DEBUG("Auto init gnrc_uhcpc.\n");
+        extern void auto_init_gnrc_uhcpc(void);
+        auto_init_gnrc_uhcpc();
+    }
 
-/* initialize network devices */
-#ifdef MODULE_AUTO_INIT_NG_NETIF
+    /* initialize NDN module after the network devices are initialized */
+    if (IS_USED(MODULE_NDN_RIOT)) {
+        LOG_DEBUG("Auto init NDN.\n");
+        extern void ndn_init(void);
+        ndn_init();
+    }
 
-#ifdef MODULE_NG_AT86RF2XX
-    extern void auto_init_ng_at86rf2xx(void);
-    auto_init_ng_at86rf2xx();
-#endif
+    /* initialize sensors and actuators */
+    if (IS_USED(MODULE_SHT1X)) {
+        /* The sht1x module needs to be initialized regardless of SAUL being used,
+         * as the shell commands rely on auto-initialization. auto_init_sht1x also
+         * performs SAUL registration, but only if module auto_init_saul is used.
+         */
+        LOG_DEBUG("Auto init sht1x.\n");
+        extern void auto_init_sht1x(void);
+        auto_init_sht1x();
+    }
 
-#ifdef MODULE_XBEE
-    extern void auto_init_xbee(void);
-    auto_init_xbee();
-#endif
+    if (IS_USED(MODULE_AUTO_INIT_SAUL)) {
+        LOG_DEBUG("Auto init SAUL.\n");
+        extern void saul_init_devs(void);
+        saul_init_devs();
+    }
 
-#ifdef MODULE_KW2XRF
-    extern void auto_init_kw2xrf(void);
-    auto_init_kw2xrf();
-#endif
+    if (IS_USED(MODULE_AUTO_INIT_GNRC_RPL)) {
+        LOG_DEBUG("Auto init gnrc_rpl.\n");
+        extern void auto_init_gnrc_rpl(void);
+        auto_init_gnrc_rpl();
+    }
 
-#ifdef MODULE_NG_NETDEV_ETH
-    extern void auto_init_ng_netdev_eth(void);
-    auto_init_ng_netdev_eth();
-#endif
+    if (IS_USED(MODULE_AUTO_INIT_CAN)) {
+        LOG_DEBUG("Auto init CAN.\n");
 
-#endif /* MODULE_AUTO_INIT_NG_NETIF */
+        extern void auto_init_candev(void);
+        auto_init_candev();
+    }
 
-#ifdef MODULE_NG_IPV6_NETIF
-    ng_ipv6_netif_init_by_dev();
-#endif
+    if (IS_USED(MODULE_SUIT)) {
+        LOG_DEBUG("Auto init SUIT conditions.\n");
+        extern void suit_init_conditions(void);
+        suit_init_conditions();
+    }
+
+    if (IS_USED(MODULE_AUTO_INIT_SECURITY)) {
+        if (IS_USED(MODULE_CRYPTOAUTHLIB)) {
+            LOG_DEBUG("Auto init cryptoauthlib.\n");
+            extern void auto_init_atca(void);
+            auto_init_atca();
+        }
+    }
+
+    if (IS_USED(MODULE_TEST_UTILS_INTERACTIVE_SYNC) && !IS_USED(MODULE_SHELL)) {
+        extern void test_utils_interactive_sync(void);
+        test_utils_interactive_sync();
+    }
+
+    if (IS_USED(MODULE_AUTO_INIT_DHCPV6_CLIENT)) {
+        LOG_DEBUG("Auto init DHCPv6 client.\n");
+        extern void dhcpv6_client_auto_init(void);
+        dhcpv6_client_auto_init();
+    }
+
+    if (IS_USED(MODULE_GNRC_DHCPV6_CLIENT_6LBR)) {
+        LOG_DEBUG("Auto init 6LoWPAN border router DHCPv6 client\n");
+        extern void gnrc_dhcpv6_client_6lbr_init(void);
+        gnrc_dhcpv6_client_6lbr_init();
+    }
+
+    if (IS_USED(MODULE_AUTO_INIT_MULTIMEDIA)) {
+        LOG_DEBUG("auto_init MULTIMEDIA\n");
+        if (IS_USED(MODULE_DFPLAYER)) {
+            extern void auto_init_dfplayer(void);
+            auto_init_dfplayer();
+        }
+    }
 }

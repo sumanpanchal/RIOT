@@ -7,22 +7,22 @@
  */
 
 /**
- * @defgroup    board_mulle Eistec Mulle
- * @ingroup     boards
- * @brief       Board specific files for Eistec Mulle IoT boards
+ * @ingroup     boards_mulle
  * @{
  *
  * @file
  * @brief       Board specific definitions for the Eistec Mulle IoT board
  *
- * @author      Joakim Gebart <joakim.gebart@eistec.se>
+ * @author      Joakim Nohlgård <joakim.nohlgard@eistec.se>
  */
 
-#ifndef BOARD_H_
-#define BOARD_H_
+#ifndef BOARD_H
+#define BOARD_H
 
 #include "cpu.h"
 #include "periph_conf.h"
+#include "mulle-nvram.h"
+#include "mtd.h"
 
 /* Use the on board RTC 32kHz clock for LPTMR clocking. */
 #undef LPTIMER_CLKSRC
@@ -33,56 +33,56 @@
 #define DISABLE_WDOG    1
 
 /**
- * @name Assign the first hardware timer.
- * This timer will be used to implement an absolute reference for hwtimer_now() et al.
+ * @brief Use the UART1 for STDIO on this board
  */
-#define HW_TIMER            TIMER_0
+#define STDIO_UART_DEV      UART_DEV(1)
 
 /**
- * @name Number of subsequent channels of the PIT to assign to the RIOT hardware
- * timer library, starting after the HW_TIMER above.
- */
-#define HW_TIMERS_COUNT      1
-
-/**
- * @name Define UART device and baudrate for stdio
+ * @name    xtimer configuration
  * @{
  */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      (115200U)
-#define STDIO_RX_BUFSIZE    (64U)
+#if 0
+/* LPTMR xtimer configuration */
+/* WIP, Use PIT for now */
+#define XTIMER_DEV                  (TIMER_LPTMR_DEV(0))
+/* LPTMR is 16 bits wide */
+#define XTIMER_WIDTH                (16)
+#define XTIMER_BACKOFF              (4)
+#define XTIMER_ISR_BACKOFF          (4)
+#define XTIMER_HZ                   (32768ul)
+#else
+/* PIT xtimer configuration */
+#define XTIMER_DEV                  (TIMER_PIT_DEV(0))
+#define XTIMER_CHAN                 (0)
+#define XTIMER_BACKOFF              (40)
+#define XTIMER_ISR_BACKOFF          (40)
+#endif
 /** @} */
 
 /**
- * @name LEDs configuration
+ * @name    LED pin definitions and handlers
  * @{
  */
+#define LED_PORT            PTC
+#define LED0_BIT            (15)
+#define LED1_BIT            (14)
+#define LED2_BIT            (13)
 
-#define LED_RED_GPIO        GPIO_0
-#define LED_RED_PORT        GPIO_0_DEV
-#define LED_RED_PIN         GPIO_0_PIN
-#define LED_YELLOW_GPIO     GPIO_1
-#define LED_YELLOW_PORT     GPIO_1_DEV
-#define LED_YELLOW_PIN      GPIO_1_PIN
-#define LED_GREEN_GPIO      GPIO_2
-#define LED_GREEN_PORT      GPIO_2_DEV
-#define LED_GREEN_PIN       GPIO_2_PIN
+#define LED0_PIN            GPIO_PIN(PORT_C, LED0_BIT)
+#define LED1_PIN            GPIO_PIN(PORT_C, LED1_BIT)
+#define LED2_PIN            GPIO_PIN(PORT_C, LED2_BIT)
 
-/** @} */
+#define LED0_ON             (LED_PORT->PSOR = (1 << LED0_BIT))
+#define LED0_OFF            (LED_PORT->PCOR = (1 << LED0_BIT))
+#define LED0_TOGGLE         (LED_PORT->PTOR = (1 << LED0_BIT))
 
-/**
- * @name Macros for controlling the on-board LEDs.
- * @{
- */
-#define LED_RED_ON          (BITBAND_REG32(LED_RED_PORT->PSOR, LED_RED_PIN) = 1)
-#define LED_RED_OFF         (BITBAND_REG32(LED_RED_PORT->PCOR, LED_RED_PIN) = 1)
-#define LED_RED_TOGGLE      (BITBAND_REG32(LED_RED_PORT->PTOR, LED_RED_PIN) = 1)
-#define LED_YELLOW_ON       (BITBAND_REG32(LED_YELLOW_PORT->PSOR, LED_YELLOW_PIN) = 1)
-#define LED_YELLOW_OFF      (BITBAND_REG32(LED_YELLOW_PORT->PCOR, LED_YELLOW_PIN) = 1)
-#define LED_YELLOW_TOGGLE   (BITBAND_REG32(LED_YELLOW_PORT->PTOR, LED_YELLOW_PIN) = 1)
-#define LED_GREEN_ON        (BITBAND_REG32(LED_GREEN_PORT->PSOR, LED_GREEN_PIN) = 1)
-#define LED_GREEN_OFF       (BITBAND_REG32(LED_GREEN_PORT->PCOR, LED_GREEN_PIN) = 1)
-#define LED_GREEN_TOGGLE    (BITBAND_REG32(LED_GREEN_PORT->PTOR, LED_GREEN_PIN) = 1)
+#define LED1_ON             (LED_PORT->PSOR = (1 << LED1_BIT))
+#define LED1_OFF            (LED_PORT->PCOR = (1 << LED1_BIT))
+#define LED1_TOGGLE         (LED_PORT->PTOR = (1 << LED1_BIT))
+
+#define LED2_ON             (LED_PORT->PSOR = (1 << LED2_BIT))
+#define LED2_OFF            (LED_PORT->PCOR = (1 << LED2_BIT))
+#define LED2_TOGGLE         (LED_PORT->PTOR = (1 << LED2_BIT))
 /** @} */
 
 #ifdef __cplusplus
@@ -94,73 +94,78 @@ extern "C" {
  */
 void board_init(void);
 
-/**
- * Define the type for the radio packet length for the transceiver
- */
-typedef uint8_t radio_packet_length_t;
-
 #ifdef __cplusplus
 }
 #endif
 
 /**
- * @name Define the interface to the AT86RF231 radio
+ * @name Define the interface to the AT86RF212B radio
  * @{
  */
-#define AT86RF231_SPI       SPI_0
-#define AT86RF231_CS        GPIO_14
-#define AT86RF231_INT       GPIO_12
-/** @todo work around missing RESET pin on Mulle v0.6x */
-#define AT86RF231_RESET     GPIO_5
-#define AT86RF231_SLEEP     GPIO_13
+
+ /** @todo Work around missing RESET pin on Mulle v0.6x
+ *
+ * {spi bus, spi speed, cs pin, int pin, reset pin, sleep pin}
+ * @{
+ */
+#define AT86RF2XX_PARAM_CS             SPI_HWCS(1)
+#define AT86RF2XX_PARAM_INT            GPIO_PIN(PORT_B, 9)
+#define AT86RF2XX_PARAM_SLEEP          GPIO_PIN(PORT_E, 6)
+#define AT86RF2XX_PARAM_RESET          GPIO_PIN(PORT_C, 12)
 /** @} */
 
 /**
  * @name LIS3DH configuration
  * @{
  */
-
-#define LIS3DH_INT1   GPIO_3
-#define LIS3DH_INT2   GPIO_4
-#define LIS3DH_CS     GPIO_15
-#define LIS3DH_SPI    SPI_2
-
+#define LIS3DH_PARAM_INT1           GPIO_PIN(PORT_C, 18)
+#define LIS3DH_PARAM_INT2           GPIO_PIN(PORT_C, 17)
+#define LIS3DH_PARAM_CS             SPI_HWCS(0)
+#define LIS3DH_PARAM_CLK            (SPI_CLK_5MHZ)
 /** @} */
 
 /**
  * @name Mulle power control configuration
  */
 /** @{ */
-#define MULLE_POWER_AVDD    GPIO_6 /**< AVDD enable pin */
-#define MULLE_POWER_VPERIPH GPIO_7 /**< VPERIPH enable pin */
-#define MULLE_POWER_VSEC    GPIO_5 /**< VSEC enable pin */
+#define MULLE_POWER_AVDD        GPIO_PIN(PORT_B, 17) /**< AVDD enable pin */
+#define MULLE_POWER_VPERIPH     GPIO_PIN(PORT_D,  7) /**< VPERIPH enable pin */
+#define MULLE_POWER_VSEC        GPIO_PIN(PORT_B, 16) /**< VSEC enable pin */
 /** @} */
 
 /**
- * @name K60 clock dividers
+ * @name Mulle NVRAM hardware configuration
  */
 /** @{ */
-/**
- * System clock divider setting, the actual hardware register value, see reference manual for details.
- */
-#define CONFIG_CLOCK_K60_SYS_DIV 0x00
-
-/**
- * Bus clock divider setting, the actual hardware register value, see reference manual for details
- */
-#define CONFIG_CLOCK_K60_BUS_DIV 0x01
-
-/**
- * Flexbus clock divider setting, the actual hardware register value, see reference manual for details
- */
-#define CONFIG_CLOCK_K60_FB_DIV 0x01
-
-/**
- * Flash clock divider setting, the actual hardware register value, see reference manual for details
- */
-#define CONFIG_CLOCK_K60_FLASH_DIV 0x03
-
+#define MULLE_NVRAM_SPI_DEV             SPI_DEV(0)
+#define MULLE_NVRAM_SPI_CLK             SPI_CLK_5MHZ
+#define MULLE_NVRAM_SPI_CS              SPI_HWCS(3) /**< FRAM CS pin */
+#define MULLE_NVRAM_CAPACITY            512     /**< FRAM size, in bytes */
+#define MULLE_NVRAM_SPI_ADDRESS_COUNT   1       /**< FRAM addressing size, in bytes */
 /** @} */
 
-#endif /* BOARD_H_ */
+/**
+ * @name Mulle NOR flash hardware configuration
+ */
+/** @{ */
+#define MULLE_NOR_SPI_DEV               SPI_DEV(0)
+#define MULLE_NOR_SPI_CLK               SPI_CLK_5MHZ
+#define MULLE_NOR_SPI_CS                SPI_HWCS(2) /**< Flash CS pin */
+/** @} */
+/**
+ * @name MTD configuration
+ */
+/** @{ */
+extern mtd_dev_t *mtd0;
+#define MTD_0 mtd0
+/** @} */
+
+/**
+ * @name Mulle Vchr, Vbat ADC lines
+ */
+/** @{ */
+#define MULLE_VBAT_ADC_LINE           ADC_LINE(6)
+#define MULLE_VCHR_ADC_LINE           ADC_LINE(7)
+/** @} */
+#endif /* BOARD_H */
 /** @} */

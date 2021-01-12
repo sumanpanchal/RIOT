@@ -7,15 +7,19 @@
  */
 
 /**
- * @defgroup    driver_l3g4200d L3G4200D gyroscope
- * @ingroup     drivers
+ * @defgroup    drivers_l3g4200d L3G4200D gyroscope
+ * @ingroup     drivers_sensors
+ * @ingroup     drivers_saul
  * @brief       Device driver for the L3G4200D gyroscope
+ *
+ * This driver provides @ref drivers_saul capabilities.
+ *
+ * @note The current state of the driver only implements a very basic polling mode.
+ *
  * @{
  *
  * @file
  * @brief       Device driver interface for the L3G4200D gyroscope
- *
- * @note The current state of the driver only implements a very basic polling mode.
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
@@ -33,32 +37,34 @@
 #endif
 
 /**
- * @brief The sensors default I2C address
+ * @defgroup drivers_l3g4200d_config     L3G4200D gyroscope driver compile configuration
+ * @ingroup config_drivers_sensors
+ * @{
  */
-#define L3G4200D_DEFAULT_ADDRESS        0x68
+/**
+ * @brief Default address
+ *
+ * The address depends on the status of SDO Pin. Default
+ * address corresponds to SDO connected to GND. For more
+ * information refer to the section 'I2C Operation' in
+ * the datasheet.
+ */
+#ifndef CONFIG_L3G4200D_DEFAULT_ADDRESS
+#define CONFIG_L3G4200D_DEFAULT_ADDRESS        0x68
+#endif
+/** @} */
 
 /**
- * @brief Device descriptor for L3G4200D sensors
- */
-typedef struct {
-    i2c_t i2c;              /**< I2C device the sensor is connected to */
-    uint8_t addr;           /**< the sensors slave address on the I2C bus */
-    gpio_t int1;            /**< INT1 pin */
-    gpio_t int2;            /**< INT2 (DRDY) pin */
-    int32_t scale;          /**< scaling factor to normalize results */
-} l3g4200d_t;
-
-/**
- * @brief Result vector for gyro measurement
+ * @brief   Result vector for gyro measurement
  */
 typedef struct {
     int16_t acc_x;          /**< roll rate in dgs (degree per second) */
-     int16_t acc_y;         /**< pitch rate in dgs */
+    int16_t acc_y;          /**< pitch rate in dgs */
     int16_t acc_z;          /**< yaw rate in dgs */
 } l3g4200d_data_t;
 
 /**
- * @brief Measurement scale for the gyro
+ * @brief   Measurement scale for the gyro
  */
 typedef enum {
     L3G4200D_SCALE_250DPS  = 0x0,       /**< scale: 250 degree per second */
@@ -67,7 +73,7 @@ typedef enum {
 } l3g4200d_scale_t;
 
 /**
- * @brief Sampling frequency and bandwidth settings for the gyro
+ * @brief   Sampling frequency and bandwidth settings for the gyro
  */
 typedef enum {
     L3G4200D_MODE_100_12  = 0x0,        /**< data rate: 100Hz, cut-off: 12.5Hz */
@@ -87,25 +93,38 @@ typedef enum {
 } l3g4200d_mode_t;
 
 /**
- * @brief Initialize a gyro
+ * @brief   Device initialization parameters
+ */
+typedef struct {
+    i2c_t i2c;              /**< I2C device the sensor is connected to */
+    uint8_t addr;           /**< the sensors slave address on the I2C bus */
+    gpio_t int1;            /**< INT1 pin */
+    gpio_t int2;            /**< INT2 (DRDY) pin */
+    l3g4200d_mode_t mode;   /**< sampling frequency and bandwidth mode */
+    l3g4200d_scale_t scale; /**< scaling factor to normalize results */
+} l3g4200d_params_t;
+
+/**
+ * @brief   Device descriptor for L3G4200D sensors
+ */
+typedef struct {
+    l3g4200d_params_t params;     /**< device initialization parameters */
+    int32_t scale;                /**< internal scaling factor to normalize results */
+} l3g4200d_t;
+
+/**
+ * @brief   Initialize a gyro
  *
  * @param[out] dev          device descriptor of sensor to initialize
- * @param[in]  i2c          I2C bus the gyro is connected to
- * @param[in]  address      gyro's I2C slave address
- * @param[in]  int1_pin     INT pin the gyro is connected to
- * @param[in]  int2_pin     DRDY pin the gyro is connected to
- * @param[in]  mode         bandwidth and sampling rate settings
- * @param[in]  scale        scaling of results
+ * @param[in]  params       initialization parameters
  *
  * @return                  0 on success
  * @return                  -1 on error
  */
-int l3g4200d_init(l3g4200d_t *dev, i2c_t i2c, uint8_t address,
-                  gpio_t int1_pin, gpio_t int2_pin,
-                  l3g4200d_mode_t mode, l3g4200d_scale_t scale);
+int l3g4200d_init(l3g4200d_t *dev, const l3g4200d_params_t *params);
 
 /**
- * @brief Read angular speed value in degree per second from gyro
+ * @brief   Read angular speed value in degree per second from gyro
  *
  * @param[in]  dev          device descriptor of gyro
  * @param[out] acc_data     result vector in dps per axis
@@ -113,27 +132,27 @@ int l3g4200d_init(l3g4200d_t *dev, i2c_t i2c, uint8_t address,
  * @return                  0 on success
  * @return                  -1 on error
  */
-int l3g4200d_read(l3g4200d_t *dev, l3g4200d_data_t *acc_data);
+int l3g4200d_read(const l3g4200d_t *dev, l3g4200d_data_t *acc_data);
 
 /**
- * @brief Power-up the given device
+ * @brief   Power-up the given device
  *
  * @param[in]  dev          device to enable
  *
  * @return                  0 on success
  * @return                  -1 on error
  */
-int l3g4200d_enable(l3g4200d_t *dev);
+int l3g4200d_enable(const l3g4200d_t *dev);
 
 /**
- * @brief Power-down the given device
+ * @brief   Power-down the given device
  *
  * @param[in]  dev          device to power-down
  *
  * @return                  0 on success
  * @return                  -1 on error
  */
-int l3g4200d_disable(l3g4200d_t *dev);
+int l3g4200d_disable(const l3g4200d_t *dev);
 
 #ifdef __cplusplus
 }

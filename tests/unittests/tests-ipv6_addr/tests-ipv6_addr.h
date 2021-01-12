@@ -11,12 +11,12 @@
  * @{
  *
  * @file
- * @brief       Unittests for the ``ng_ipv6_addr`` module
+ * @brief       Unittests for the ``ipv6_addr`` module
  *
  * @author      Martine Lenders <mlenders@inf.fu-berlin.de>
  */
-#ifndef TESTS_IPV6_ADDR_H_
-#define TESTS_IPV6_ADDR_H_
+#ifndef TESTS_IPV6_ADDR_H
+#define TESTS_IPV6_ADDR_H
 
 #include "embUnit.h"
 
@@ -33,5 +33,5 @@ void tests_ipv6_addr(void);
 }
 #endif
 
-#endif /* TESTS_IPV6_ADDR_H_ */
+#endif /* TESTS_IPV6_ADDR_H */
 /** @} */

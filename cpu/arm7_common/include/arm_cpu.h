@@ -6,8 +6,8 @@
  * directory for more details.
  */
 
-#ifndef ARM_CPU_H_
-#define ARM_CPU_H_
+#ifndef ARM_CPU_H
+#define ARM_CPU_H
 
 #include <stdint.h>
 #include "VIC.h"
@@ -20,28 +20,34 @@
 #define NEW_TASK_CPSR 0x1F
 #define WORDSIZE 32
 
-extern void dINT(void);
-extern void eINT(void);
-
 uint32_t get_system_speed(void);
 void cpu_clock_scale(uint32_t source, uint32_t target, uint32_t *prescale);
 
 void arm_reset(void);
-void stdio_flush(void);
 
 /**
- * @brief Writes an array of characters to the UART0 device
+ * @brief Interrupt stack canary value
  *
- * @param[in] astring   The string to write
- * @param[in] length    Length of the string
- *
- * @returns Always @p length
+ * @note 0xeafffffe is the ARM machine code equivalent of asm("b #0") or
+ * 'while (1);', i.e. an infinite loop.
+ * @internal
  */
-int uart0_puts(char *astring, int length);
+#define STACK_CANARY_WORD   (0xEAFFFFFEu)
 
+/**
+ * @brief   Select fastest bitarithm_lsb implementation
+ * @{
+ */
+#ifdef __ARM_FEATURE_CLZ
+#define BITARITHM_LSB_BUILTIN
+#define BITARITHM_HAS_CLZ
+#else
+#define BITARITHM_LSB_LOOKUP
+#endif
+/** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ARM_CPU_H_ */
+#endif /* ARM_CPU_H */
