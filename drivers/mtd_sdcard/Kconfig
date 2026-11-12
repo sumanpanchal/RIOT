@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2020 Freie Universitaet Berlin
+# SPDX-FileCopyrightText: 2020 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "MTD_SDCARD driver"
+    depends on USEMODULE_MTD_SDCARD
+
+config SDCARD_GENERIC_MTD_OFFSET
+    depends on USEMODULE_MTD_SDCARD_DEFAULT
+    int "Index of first auto-configured MTD SDcard device"
+    default 1
+    help
+        If you have other MTD devices defined, set this number so that
+        the auto-configured SD Card(s) from mtd_sdcard_default will come after them.
+
+config MTD_SDCARD_ERASE
+    bool "Enable SD card erase"
+    help
+        Enable this to erase sector before a data write operation.
+        SDCards handle sector erase internally so its
+        possible to directly write to the card without erasing
+        the sector first hence this feature is disabled by default.
+
+endmenu # MTD_SDCARD driver

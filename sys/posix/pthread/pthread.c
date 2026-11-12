@@ -1,15 +1,10 @@
 /*
- * Copyright (C) 2013 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2013 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /**
- * @defgroup pthread POSIX threads
- * POSIX conforming multi-threading features.
- * @ingroup posix
+ * @ingroup pthread
  * @{
  * @file
  * @brief   Thread creation features.
@@ -19,14 +14,12 @@
  * @}
  */
 
-#include <malloc.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
 #include "cpu_conf.h"
 #include "irq.h"
-#include "kernel_internal.h"
 #include "msg.h"
 #include "mutex.h"
 #include "priority_queue.h"
@@ -35,28 +28,36 @@
 
 #include "pthread.h"
 
-#define ENABLE_DEBUG (0)
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 
-#if ENABLE_DEBUG
-#   define PTHREAD_REAPER_STACKSIZE THREAD_STACKSIZE_MAIN
+#define ENABLE_DEBUG 0
+
+#ifndef CONFIG_PTHREAD_REAPER_BASE_STACKSIZE
+#define CONFIG_PTHREAD_REAPER_BASE_STACKSIZE (THREAD_STACKSIZE_IDLE)
+#endif
+
+#if IS_ACTIVE(ENABLE_DEBUG)
+#   define PTHREAD_REAPER_STACKSIZE ((CONFIG_PTHREAD_REAPER_BASE_STACKSIZE) + THREAD_EXTRA_STACKSIZE_PRINTF)
 #   define PTHREAD_STACKSIZE THREAD_STACKSIZE_MAIN
 #else
-#   define PTHREAD_REAPER_STACKSIZE THREAD_STACKSIZE_DEFAULT
+#   define PTHREAD_REAPER_STACKSIZE (CONFIG_PTHREAD_REAPER_BASE_STACKSIZE)
 #   define PTHREAD_STACKSIZE THREAD_STACKSIZE_DEFAULT
 #endif
 
 #include "debug.h"
 
-enum pthread_thread_status {
+typedef enum {
     PTS_RUNNING,
     PTS_DETACHED,
     PTS_ZOMBIE,
-};
+} pthread_thread_status_t;
 
-typedef struct pthread_thread {
+typedef struct {
     kernel_pid_t thread_pid;
 
-    enum pthread_thread_status status;
+    pthread_thread_status_t status;
     kernel_pid_t joining_thread;
     void *returnval;
     bool should_cancel;
@@ -72,7 +73,7 @@ typedef struct pthread_thread {
 } pthread_thread_t;
 
 static pthread_thread_t *volatile pthread_sched_threads[MAXTHREADS];
-static struct mutex_t pthread_mutex;
+static mutex_t pthread_mutex;
 
 static volatile kernel_pid_t pthread_reaper_pid = KERNEL_PID_UNDEF;
 
@@ -87,7 +88,7 @@ static void *pthread_start_routine(void *pt_)
 
 static int insert(pthread_thread_t *pt)
 {
-    int result = -1;
+    int result = KERNEL_PID_UNDEF;
     mutex_lock(&pthread_mutex);
 
     for (int i = 0; i < MAXTHREADS; i++){
@@ -120,6 +121,10 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr, void *(*sta
 {
     pthread_thread_t *pt = calloc(1, sizeof(pthread_thread_t));
 
+    if (pt == NULL) {
+        return -ENOMEM;
+    }
+
     kernel_pid_t pthread_pid = insert(pt);
     if (pthread_pid == KERNEL_PID_UNDEF) {
         free(pt);
@@ -134,19 +139,31 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr, void *(*sta
     bool autofree = attr == NULL || attr->ss_sp == NULL || attr->ss_size == 0;
     size_t stack_size = attr && attr->ss_size > 0 ? attr->ss_size : PTHREAD_STACKSIZE;
     void *stack = autofree ? malloc(stack_size) : attr->ss_sp;
-    pt->stack = autofree ? stack : NULL;
 
-    if (autofree && pthread_reaper_pid != KERNEL_PID_UNDEF) {
+    if (stack == NULL) {
+        free(pt);
+        return -ENOMEM;
+    }
+
+    pt->stack = autofree ? stack : NULL;
+    if (autofree && pthread_reaper_pid == KERNEL_PID_UNDEF) {
         mutex_lock(&pthread_mutex);
-        if (pthread_reaper_pid != KERNEL_PID_UNDEF) {
+        if (pthread_reaper_pid == KERNEL_PID_UNDEF) {
             /* volatile pid to overcome problems with double checking */
             volatile kernel_pid_t pid = thread_create(pthread_reaper_stack,
                                              PTHREAD_REAPER_STACKSIZE,
                                              0,
-                                             CREATE_STACKTEST,
+                                             0,
                                              pthread_reaper,
                                              NULL,
                                              "pthread-reaper");
+            if (!pid_is_valid(pid)) {
+                free(pt->stack);
+                free(pt);
+                pthread_sched_threads[pthread_pid-1] = NULL;
+                mutex_unlock(&pthread_mutex);
+                return -1;
+            }
             pthread_reaper_pid = pid;
         }
         mutex_unlock(&pthread_mutex);
@@ -155,18 +172,19 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr, void *(*sta
     pt->thread_pid = thread_create(stack,
                                    stack_size,
                                    THREAD_PRIORITY_MAIN,
-                                   CREATE_WOUT_YIELD | CREATE_STACKTEST,
+                                   THREAD_CREATE_SLEEPING |
+                                   0,
                                    pthread_start_routine,
                                    pt,
                                    "pthread");
-    if (pt->thread_pid == KERNEL_PID_UNDEF) {
+    if (!pid_is_valid(pt->thread_pid)) {
         free(pt->stack);
         free(pt);
         pthread_sched_threads[pthread_pid-1] = NULL;
         return -1;
     }
 
-    sched_switch(THREAD_PRIORITY_MAIN);
+    thread_wakeup(pt->thread_pid);
 
     return 0;
 }
@@ -206,7 +224,7 @@ void pthread_exit(void *retval)
             }
         }
 
-        dINT();
+        irq_disable();
         if (self->stack) {
             msg_t m;
             m.content.ptr = self->stack;
@@ -231,10 +249,10 @@ int pthread_join(pthread_t th, void **thread_return)
 
     switch (other->status) {
         case (PTS_RUNNING):
-            other->joining_thread = sched_active_pid;
+            other->joining_thread = thread_getpid();
             /* go blocked, I'm waking up if other thread exits */
             thread_sleep();
-            /* no break */
+            /* falls through */
         case (PTS_ZOMBIE):
             if (thread_return) {
                 *thread_return = other->returnval;
@@ -279,7 +297,7 @@ pthread_t pthread_self(void)
 {
     pthread_t result = 0;
     mutex_lock(&pthread_mutex);
-    kernel_pid_t pid = sched_active_pid; /* sched_active_pid is volatile */
+    kernel_pid_t pid = thread_getpid(); /* thread_getpid() is volatile */
     for (int i = 0; i < MAXTHREADS; i++) {
         if (pthread_sched_threads[i] && pthread_sched_threads[i]->thread_pid == pid) {
             result = i+1;

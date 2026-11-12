@@ -1,0 +1,54 @@
+/*
+ * SPDX-FileCopyrightText: 2019 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+#pragma once
+
+/**
+ * @defgroup    sys_hashes_pbkdf2 PBKDF2
+ * @ingroup     sys_hashes
+ * @brief       PBKDF2 key derivation implementation.
+ * @{
+ *
+ * @file
+ * @brief       PBKDF2 key derivation implementation.
+ *
+ * @author      Juan I Carrano <j.carrano@fu-berlin.de>
+ *
+ * @}
+ */
+
+#include "hashes/sha256.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief   PBKDF2 key size length
+ *
+ * @note Currently only one derived key length is supported (32)
+ */
+#define PBKDF2_KEY_SIZE SHA256_DIGEST_LENGTH
+
+/**
+ * @brief Create a key from a password and hash using PBKDF2.
+ *
+ * @param[in]   password        password pointer
+ * @param[in]   password_len    length of password
+ * @param[in]   salt            salt pointer
+ * @param[in]   salt_len        salt length, recommended 64bit
+ * @param[in]   iterations      number of rounds. Must be >0.
+ *                              NIST’s detailed guide (Appendix A.2.2),
+ *                              recommended 10000
+ * @param[out]  output          array of size PBKDF2_KEY_SIZE
+ */
+void pbkdf2_sha256(const void *password, size_t password_len,
+                   const void *salt, size_t salt_len,
+                   int iterations,
+                   uint8_t *output);
+
+#ifdef __cplusplus
+}
+#endif

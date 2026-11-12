@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2024 TU Dresden
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menuconfig MODULE_SYS_MALLOC_MONITOR
+    bool "Heap Memory Usage Monitor"
+
+config MODULE_SYS_MALLOC_MONITOR_SIZE
+    int "Monitor Size"
+    default 100
+    depends on MODULE_SYS_MALLOC_MONITOR
+    help
+        Specifies maximum number of pointers that can be monitored at once.
+
+config MODULE_SYS_MALLOC_MONITOR_VERBOSE
+    bool "Verbose"
+    default false
+    depends on MODULE_SYS_MALLOC_MONITOR
+    help
+        Print detailed log of calls to malloc/realloc/free

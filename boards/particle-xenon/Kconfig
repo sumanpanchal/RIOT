@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2020 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+config BOARD
+    default "particle-xenon" if BOARD_PARTICLE_XENON
+
+config BOARD_PARTICLE_XENON
+    bool
+    default y
+    select BOARD_COMMON_PARTICLE_MESH
+
+source "$(RIOTBOARD)/common/particle-mesh/Kconfig"

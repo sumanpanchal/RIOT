@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2019 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "GNRC IPv6 Whitelisting"
+    depends on USEMODULE_GNRC_IPV6_WHITELIST
+
+config GNRC_IPV6_WHITELIST_SIZE
+    int "Maximum size of the whitelist"
+    default 8
+
+endmenu # GNRC IPv6 Whitelisting

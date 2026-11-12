@@ -1,15 +1,12 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser General
- * Public License v2.1. See the file LICENSE in the top level directory for more
- * details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    boards_msbiot MSB-IoT
- * @ingroup     boards
- * @brief       Board specific files for the MSB-IoT board
+ * @ingroup     boards_msbiot
  * @{
  *
  * @file
@@ -18,92 +15,63 @@
  * @author      Fabian Nack <nack@inf.fu-berlin.de>
  */
 
-#ifndef BOARD_H_
-#define BOARD_H_
-
 #include "cpu.h"
 #include "periph_conf.h"
-#include "periph/gpio.h"
-#include "periph/spi.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * Define the nominal CPU core clock in this board
- */
-#define F_CPU               CLOCK_CORECLOCK
-
-/**
- * @name Assign the hardware timer
- */
-#define HW_TIMER            TIMER_0
-
-/**
- * @name Configure connected CC1101 (radio) device
+ * @name    Configure connected CC1101 (radio) device
  * @{
  */
-#define CC110X_SPI          SPI_0
-#define CC110X_CS           GPIO(PORT_B, 12)
-#define CC110X_GDO0         GPIO(PORT_C, 4)
-#define CC110X_GDO1         GPIO(PORT_A, 6)
-#define CC110X_GDO2         GPIO(PORT_C, 5)
-
-typedef uint8_t radio_packet_length_t;
+#define CC110X_PARAM_SPI        SPI_DEV(0)              /**< SPI interface CC1101 is connected to */
+#define CC110X_PARAM_CS         GPIO_PIN(PORT_B, 12)    /**< CS pin of CC1101 */
+#define CC110X_PARAM_GDO0       GPIO_PIN(PORT_C, 4)     /**< GDO0 pin of CC1101 */
+#define CC110X_PARAM_GDO2       GPIO_PIN(PORT_C, 5)     /**< GDO2 pin of CC1101 */
+/**
+ * @brief SPI clock (reduced to work around hw bug)
+ */
+#define CC110X_PARAM_SPI_CLOCK  SPI_CLK_1MHZ
 /** @} */
 
 /**
- * @name Configure connected MPU-9150 device
+ * @name    Configure connected MPU-9150 device
  * @{
  */
-#define MPU9150_I2C         I2C_0
-#define MPU9150_HW_ADDR     (0x68)
-#define MPU9150_COMP_ADDR   (0x0E)
+#define MPU9X50_PARAM_COMP_ADDR   (0x0E)            /**< I2C address of the MPU9150 */
 /** @} */
 
 /**
- * @name Define UART device and baudrate for stdio
+ * @name    LED pin definitions and handlers
  * @{
  */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      (115200U)
-#define STDIO_RX_BUFSIZE    (64U)
+#define LED0_PIN_NUM        8       /**< Pin number of red LED */
+#define LED0_PORT           GPIO_PORT_B /**< GPIO port of LED 0 */
+#define LED0_PORT_NUM       PORT_B  /**< Port number of red LED */
+
+#define LED1_PIN_NUM        14      /**< Pin number of yellow LED */
+#define LED1_PORT           GPIO_PORT_B /**< GPIO port of LED 1 */
+#define LED1_PORT_NUM       PORT_B  /**< Port number of yellow LED */
+
+#define LED2_PIN_NUM        15      /**< Pin number of green LED */
+#define LED2_PORT           GPIO_PORT_B /**< GPIO port of LED 2 */
+#define LED2_PORT_NUM       PORT_B  /**< Port number of green LED */
 /** @} */
 
 /**
- * @name LED pin definitions
+ * @name    Button pin definitions
  * @{
  */
-#define LED_PORT            GPIOB
-#define LED_RED_PIN         (1 << 8)
-#define LED_YELLOW_PIN      (1 << 14)
-#define LED_GREEN_PIN       (1 << 15)
+#define BUTTON0_PIN         GPIO_PIN(PORT_B, 13)    /**< Pin of left button */
+#define BUTTON1_PIN         GPIO_PIN(PORT_A, 0)     /**< Pin of right button */
 /** @} */
-
-/**
- * @name Macros for controlling the on-board LEDs.
- * @{
- */
-#define LED_RED_ON          (LED_PORT->BSRRH = LED_RED_PIN)
-#define LED_RED_OFF         (LED_PORT->BSRRL = LED_RED_PIN)
-#define LED_RED_TOGGLE      (LED_PORT->ODR ^= LED_RED_PIN)
-#define LED_YELLOW_ON       (LED_PORT->BSRRH = LED_YELLOW_PIN)
-#define LED_YELLOW_OFF      (LED_PORT->BSRRL = LED_YELLOW_PIN)
-#define LED_YELLOW_TOGGLE   (LED_PORT->ODR ^= LED_YELLOW_PIN)
-#define LED_GREEN_ON        (LED_PORT->BSRRH = LED_GREEN_PIN)
-#define LED_GREEN_OFF       (LED_PORT->BSRRL = LED_GREEN_PIN)
-#define LED_GREEN_TOGGLE    (LED_PORT->ODR ^= LED_GREEN_PIN)
-/** @} */
-
-/**
- * @brief Initialize board specific hardware, including clock, LEDs and std-IO
- */
-void board_init(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BOARD_H_ */
+#include "stm32_leds.h"
+
 /** @} */

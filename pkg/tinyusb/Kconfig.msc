@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2022 Gunar Schorcht
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_TINYUSB_CLASS_MSC && USEMODULE_TINYUSB_DEVICE
+
+config TUSBD_MSC_NUMOF
+    int
+    default 1
+
+config TUSBD_MSC_FS_EP_SIZE
+    int "MSC Full-Speed endpoint size [byte]"
+    default 64
+
+config TUSBD_MSC_HS_EP_SIZE
+    int "MSC High-Speed endpoint size [byte]"
+    default 512
+
+config TUSBD_MSC_STRING
+    string "MSC descriptor string"
+    depends on TUSBD_MSC_NUMOF > 0
+    default "TinyUSB MSC"
+
+endif

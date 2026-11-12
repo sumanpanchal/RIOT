@@ -1,25 +1,11 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2014  Philipp Rosenkranz <philipp.rosenkranz@fu-berlin.de>
-#
-# This library is free software; you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public
-# License as published by the Free Software Foundation; either
-# version 2.1 of the License, or (at your option) any later version.
-#
-# This library is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with this library; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-# 02110-1301 USA
+# SPDX-FileCopyrightText: 2014 Philipp Rosenkranz <philipp.rosenkranz@fu-berlin.de>
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-import sys, signal, threading
+import signal
 
 from twisted.internet import reactor
 from twisted.internet.protocol import Protocol, Factory
@@ -33,11 +19,9 @@ class PubProtocol(Protocol):
         print("new connection made")
 
     def connectionLost(self, reason):
-        self.factory.numProtocols = self.factory.numProtocols - 1
-
-    def connectionLost(self, reason):
-        self.factory.clients = {key: value for key, value in self.factory.clients.items()
-             if value is not self.transport}
+        self.factory.clients = {
+            key: value for key, value in self.factory.clients.items()
+            if value is not self.transport}
 
     def dataReceived(self, data):
         if data.startswith("hostname: "):
@@ -46,6 +30,7 @@ class PubProtocol(Protocol):
             self.factory.clients[remoteHostname] = self.transport
         else:
             print("received some useless data...")
+
 
 class PubFactory(Factory):
     def __init__(self):
@@ -78,14 +63,13 @@ class ExperimentRunner():
         if reactor.running:
             try:
                 reactor.stop()
-            except:
+            except Exception:
                 print("tried to shutdown reactor twice!")
-
 
     def handle_sigint(self, signal, frame):
         self.experiment.stop()
         self.testbed.stop()
-        self.stop() # shutdown if experiment didn't already
+        self.stop()  # shutdown if experiment didn't already
 
 
 class Experiment():
@@ -129,7 +113,7 @@ class Experiment():
             print("sendToHost: no such host known: " + host + " !")
 
     def sendToAll(self, cmd=""):
-       for host, transport in self.factory.clients.items():
+        for host, transport in self.factory.clients.items():
             self.sendToHost(host, cmd)
 
     def pauseInSeconds(self, seconds=0):
@@ -138,10 +122,10 @@ class Experiment():
         while (time() - start < seconds):
             sleep(seconds - (time() - start))
 
-    def callLater(self, absoluteDelay = 0.0, function = None):
+    def callLater(self, absoluteDelay=0.0, function=None):
         reactor.callLater(absoluteDelay, function)
 
-    def waitAndCall(self, relativeDelay = 0.0, function = None):
+    def waitAndCall(self, relativeDelay=0.0, function=None):
         self.sumDelay += relativeDelay
         self.callLater(self.sumDelay, function)
 

@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2022 Gunar Schorcht
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_TINYUSB_CLASS_HID && USEMODULE_TINYUSB_DEVICE
+
+config TUSBD_HID_NUMOF
+    int "Number of HID interfaces"
+    default 1
+    range 1 2
+
+config TUSBD_HID_EP_SIZE
+    int "HID endpoint size [byte]"
+    default 64
+
+config TUSBD_HID_0_POLL_INTERVALL
+    int "HID0 polling interval [ms]"
+    depends on TUSBD_HID_NUMOF > 0
+    default 10
+
+config TUSBD_HID_0_STRING
+    string "HID0 descriptor string"
+    depends on TUSBD_HID_NUMOF > 0
+    default "TinyUSB HID0 (Generic In/Out)"
+
+config TUSBD_HID_1_POLL_INTERVALL
+    int "HID1 polling interval [ms]"
+    depends on TUSBD_HID_NUMOF > 1
+    default 10
+
+config TUSBD_HID_1_STRING
+    string "HID1 descriptor string"
+    depends on TUSBD_HID_NUMOF > 1
+    default "TinyUSB HID1 (Generic In/Out)"
+
+endif

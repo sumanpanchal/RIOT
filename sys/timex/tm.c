@@ -1,19 +1,6 @@
 /*
- * Copyright (C) 2014  René Kijewski  <rene.kijewski@fu-berlin.de>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 /**
@@ -49,7 +36,11 @@ int tm_doomsday(int year)
     return result;
 }
 
+#ifndef ATMEGA_INCOMPATIBLE_TIME_H
 void tm_get_wyday(int year, int mon, int mday, int *wday, int *yday)
+#else
+void tm_get_wyday(int year, int mon, int mday, int8_t *wday, int16_t *yday)
+#endif
 {
     int is_leap_year = tm_is_leap_year(year);
     *yday = TM_MON_DAYS_ACCU[mon] + mday + (mon <= TM_MON_FEB ? 0 : is_leap_year) - 1;

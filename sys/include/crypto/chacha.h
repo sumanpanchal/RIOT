@@ -1,25 +1,10 @@
 /*
- * Copyright (C) 2008  D. J. Bernstein  (dedicated to the public domain)
- * Copyright (C) 2015  René Kijewski  <rene.kijewski@fu-berlin.de>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
+ * SPDX-FileCopyrightText: 2008 D. J. Bernstein (dedicated to the public domain)
+ * SPDX-FileCopyrightText: 2015 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: MIT
  */
+
+#pragma once
 
 /**
  * @ingroup     sys_crypto
@@ -31,11 +16,10 @@
  * @author      René Kijewski <rene.kijewski@fu-berlin.de>
  */
 
-#ifndef CRYPTO_CHACHA_H_
-#define CRYPTO_CHACHA_H_
-
 #include <stdint.h>
 #include <stddef.h>
+
+#include "compiler_hints.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,10 +29,9 @@ extern "C" {
  * @brief A ChaCha cipher stream context.
  * @details Initialize with chacha_init().
  */
-typedef struct
-{
+typedef struct {
     uint32_t state[16]; /**< The current state of the stream. */
-    uint8_t rounds; /**< Number of iterations. */
+    uint8_t rounds;     /**< Number of iterations. */
 } chacha_ctx;
 
 /**
@@ -60,9 +43,10 @@ typedef struct
  * @param[in]  keylen  Length (in bytes) of @p key. Must be 16 or 32.
  * @param[in]  nonce   IV / nonce to use.
  *
- * @returns `== 0` on success.
- * @returns `< 0` if an illegal value for @p rounds or @p keylen was suppplied.
+ * @retval     0       success
+ * @retval     <0      value of @p rounds or @p keylen is illegal
  */
+ACCESS(read_only, 3, 4)
 int chacha_init(chacha_ctx *ctx,
                 unsigned rounds,
                 const uint8_t *key, uint32_t keylen,
@@ -74,7 +58,7 @@ int chacha_init(chacha_ctx *ctx,
  * @details If you want to seek inside the cipher steam, then you have to
  *          update the clock in `ctx->state[13]:ctx->state[12]` manually.
  *
- * @warning You need to re-initialized the context with a new nonce after 2^64
+ * @warning You need to re-initialize the context with a new nonce after 2^64
  *          encrypted blocks, or the keystream will repeat!
  *
  * @param[in,out] ctx The ChaCha context
@@ -88,7 +72,7 @@ void chacha_keystream_bytes(chacha_ctx *ctx, void *x);
  * @details @p m is always the input regardless if it is the plaintext or ciphertext,
  *          and @p c vice verse.
  *
- * @warning You need to re-initialized the context with a new nonce after 2^64
+ * @warning You need to re-initialize the context with a new nonce after 2^64
  *          encrypted blocks, or the keystream will repeat!
  *
  * @param[in,out] ctx The ChaCha context.
@@ -100,7 +84,8 @@ void chacha_encrypt_bytes(chacha_ctx *ctx, const uint8_t *m, uint8_t *c);
 /**
  * @copydoc chacha_encrypt_bytes()
  */
-static inline void chacha_decrypt_bytes(chacha_ctx *ctx, const uint8_t *m, uint8_t *c)
+static inline void chacha_decrypt_bytes(chacha_ctx *ctx, const uint8_t *m,
+                                        uint8_t *c)
 {
     chacha_encrypt_bytes(ctx, m, c);
 }
@@ -123,6 +108,7 @@ static inline void chacha_decrypt_bytes(chacha_ctx *ctx, const uint8_t *m, uint8
  * @param[in] data  Some random data.
  * @param[in] bytes Length of @p data in bytes where `0 < bytes <= 64`.
  */
+ACCESS(read_only, 1, 2)
 void chacha_prng_seed(const void *data, size_t bytes);
 
 /**
@@ -130,6 +116,8 @@ void chacha_prng_seed(const void *data, size_t bytes);
  *
  * @warning After you have read 2^68 numbers you have to re-seed the PRNG.
  *          Otherwise the sequence will repeat.
+ *
+ * @return The random value
  */
 uint32_t chacha_prng_next(void);
 
@@ -137,8 +125,4 @@ uint32_t chacha_prng_next(void);
 }
 #endif
 
-#endif /* ifndef CRYPTO_CHACHA_H_ */
-
-/**
- * @}
- */
+/** @} */

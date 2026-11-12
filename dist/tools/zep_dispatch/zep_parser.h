@@ -1,0 +1,51 @@
+/*
+ * SPDX-FileCopyrightText: 2021 Benjamin Valentin
+ * SPDX-License-Identifier: GPL-2.0-only
+ */
+
+#ifndef ZEP_PARSER_H
+#define ZEP_PARSER_H
+
+#include <stdbool.h>
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief   Get the payload of a ZEP frame
+ *
+ * @param[in]  buffer   ZEP frame
+ * @param[in, out] len  size of buffer, will contain size of payload
+ *
+ * @return pointer to payload on success
+ *         NULL if no payload was found
+ */
+const void *zep_get_payload(const void *buffer, size_t *len);
+
+/**
+ * @brief   Parse l2 source address of a ZEP frame
+ *
+ * @param[in]  buffer   ZEP frame
+ * @param[in]  len      size of buffer
+ * @param[out] out      destination for l2 address
+ * @param[out] out_len  l2 address length
+ *
+ * @return true if l2 address was found
+ */
+bool zep_parse_mac(const void *buffer, size_t len, void *out, uint8_t *out_len);
+
+/**
+ * @brief   Set link quality information in ZEP frame
+ *
+ * @param[out] buffer   ZEP frame to modify
+ * @param[in]  lqi      link quality to write to ZEP header
+ */
+void zep_set_lqi(void *buffer, uint8_t lqi);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* ZEP_PARSER_H */

@@ -1,9 +1,6 @@
 /*
- * Copyright (C) 2013 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2013 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /**
@@ -13,12 +10,14 @@
  * @brief   Spin locks.
  * @author  Christian Mehlis <mehlis@inf.fu-berlin.de>
  * @author  René Kijewski <kijewski@inf.fu-berlin.de>
- * @author  Joakim Gebart <joakim.gebart@eistec.se>
+ * @author  Joakim Nohlgård <joakim.nohlgard@eistec.se>
  * @}
  */
 
+#include <stdint.h>
+#include <stdatomic.h>
+#include <errno.h>
 #include "pthread.h"
-#include "atomic.h"
 
 int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
@@ -27,7 +26,7 @@ int pthread_spin_init(pthread_spinlock_t *lock, int pshared)
     }
 
     (void) pshared;
-    *lock = 0;
+    atomic_flag_clear(&(lock->flag));
     return 0;
 }
 
@@ -47,7 +46,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock)
         return EINVAL;
     }
 
-    while (atomic_set_to_one((int *)lock) == 0) {
+    while (atomic_flag_test_and_set(&(lock->flag))) {
         /* spin */
     }
 
@@ -60,7 +59,7 @@ int pthread_spin_trylock(pthread_spinlock_t *lock)
         return EINVAL;
     }
 
-    if (atomic_set_to_one((int *)lock) == 0) {
+    if (atomic_flag_test_and_set(&(lock->flag))) {
         return EBUSY;
     }
 
@@ -73,9 +72,7 @@ int pthread_spin_unlock(pthread_spinlock_t *lock)
         return EINVAL;
     }
 
-    if (atomic_set_to_zero((int *)lock) == 0) {
-        return EPERM;
-    }
+    atomic_flag_clear(&(lock->flag));
 
     return 0;
 }

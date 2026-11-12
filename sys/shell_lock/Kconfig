@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2023 Inria
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_SHELL_LOCK
+
+config SHELL_LOCK_PASSWORD
+    string "Lock password"
+    default "password"
+
+config SHELL_LOCK_AUTO_LOCK_TIMEOUT_MS
+    int "Timeout in ms before automatic locking"
+    default 7000
+
+endif # USEMODULE_SHELL_LOCK

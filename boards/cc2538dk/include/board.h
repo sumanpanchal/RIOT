@@ -1,15 +1,12 @@
 /*
- * Copyright (C) 2014 Loci Controls Inc.
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Loci Controls Inc.
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    boards_cc2538dk CC2538DK
- * @ingroup     boards
- * @brief       Support for the Texas Instruments CC2538DK board.
+ * @ingroup     boards_cc2538dk
  * @{
  *
  * @file
@@ -17,71 +14,50 @@
  * @author      Ian Martin <ian@locicontrols.com>
  */
 
-#ifndef BOARD_H_
-#define BOARD_H_
-
 #include "cpu.h"
 #include "periph/gpio.h"
+#include "cc2538_eui_primary.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * Define the nominal CPU core clock in this board
- */
-#define F_CPU               XOSC32M_FREQ
-
-/**
- * Assign the hardware timer
- */
-#define HW_TIMER            TIMER_0
-
-/**
- * @name Define UART device and baudrate for stdio
+ * @name    LED pin definitions and handlers
  * @{
  */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      115200
-#define STDIO_RX_BUFSIZE    (64U)
+#define LED0_PIN            GPIO_PIN(2, 0)
+#define LED1_PIN            GPIO_PIN(2, 1)
+#define LED2_PIN            GPIO_PIN(2, 2)
+#define LED3_PIN            GPIO_PIN(2, 3)
+
+#define LED_PORT            GPIO_C
+#define LED0_BIT            (1 << 0)        /**< red LED */
+#define LED1_BIT            (1 << 1)        /**< yellow LED */
+#define LED2_BIT            (1 << 2)        /**< green LED */
+#define LED3_BIT            (1 << 3)        /**< orange LED */
+
+#define LED0_ON             (LED_PORT->DATA |=  LED0_BIT)
+#define LED0_OFF            (LED_PORT->DATA &= ~LED0_BIT)
+#define LED0_TOGGLE         (LED_PORT->DATA ^=  LED0_BIT)
+
+#define LED1_ON             (LED_PORT->DATA |=  LED1_BIT)
+#define LED1_OFF            (LED_PORT->DATA &= ~LED1_BIT)
+#define LED1_TOGGLE         (LED_PORT->DATA ^=  LED1_BIT)
+
+#define LED2_ON             (LED_PORT->DATA |=  LED2_BIT)
+#define LED2_OFF            (LED_PORT->DATA &= ~LED2_BIT)
+#define LED2_TOGGLE         (LED_PORT->DATA ^=  LED2_BIT)
+
+#define LED3_ON             (LED_PORT->DATA |=  LED3_BIT)
+#define LED3_OFF            (LED_PORT->DATA &= ~LED3_BIT)
+#define LED3_TOGGLE         (LED_PORT->DATA ^=  LED3_BIT)
 /** @} */
 
 /**
- * @name Macros for controlling the on-board LEDs.
+ * @name    Flash Customer Configuration Area (CCA) parameters
  * @{
  */
-#define LED_RED_GPIO        GPIO_PC0 /**< Red LED GPIO pin */
-#define LED_YELLOW_GPIO     GPIO_PC1 /**< Yellow LED GPIO pin */
-#define LED_GREEN_GPIO      GPIO_PC2 /**< Green LED GPIO pin */
-#define LED_ORANGE_GPIO     GPIO_PC3 /**< Orange LED GPIO pin */
-
-#define LED_RED_ON          cc2538_gpio_set(LED_GREEN_GPIO)
-#define LED_RED_OFF         cc2538_gpio_clear(LED_GREEN_GPIO)
-#define LED_RED_TOGGLE      cc2538_gpio_toggle(LED_GREEN_GPIO)
-
-#define LED_YELLOW_ON       cc2538_gpio_set(LED_YELLOW_GPIO)
-#define LED_YELLOW_OFF      cc2538_gpio_clear(LED_YELLOW_GPIO)
-#define LED_YELLOW_TOGGLE   cc2538_gpio_toggle(LED_YELLOW_GPIO)
-
-#define LED_GREEN_ON        cc2538_gpio_set(LED_GREEN_GPIO)
-#define LED_GREEN_OFF       cc2538_gpio_clear(LED_GREEN_GPIO)
-#define LED_GREEN_TOGGLE    cc2538_gpio_toggle(LED_GREEN_GPIO)
-
-#define LED_ORANGE_ON       cc2538_gpio_set(LED_ORANGE_GPIO)
-#define LED_ORANGE_OFF      cc2538_gpio_clear(LED_ORANGE_GPIO)
-#define LED_ORANGE_TOGGLE   cc2538_gpio_toggle(LED_ORANGE_GPIO)
-
-/* Default to red if the color is not specified: */
-#define LED_ON              LED_RED_ON
-#define LED_OFF             LED_RED_OFF
-#define LED_TOGGLE          LED_RED_TOGGLE
-/** @} */
-
-/**
- * @name Flash Customer Configuration Area (CCA) parameters
- * @{
- */
-
 #ifndef UPDATE_CCA
 #define UPDATE_CCA                1
 #endif
@@ -92,13 +68,16 @@ extern "C" {
 /** @} */
 
 /**
- * @brief Initialize board specific hardware, including clock, LEDs and std-IO
+ * @name    xtimer configuration
+ * @{
  */
-void board_init(void);
+#define XTIMER_WIDTH        (16)
+#define XTIMER_BACKOFF      (50)
+#define XTIMER_ISR_BACKOFF  (40)
+/** @} */
 
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif
 
-#endif /* BOARD_H_ */
 /** @} */

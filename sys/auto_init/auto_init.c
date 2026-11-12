@@ -1,356 +1,370 @@
+/*
+ * SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+ * SPDX-FileCopyrightText: 2020 Kaspar Schleiser <kaspar@schleiser.de>
+ * SPDX-FileCopyrightText: 2013 INRIA
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 /**
- * Auto initialization for used modules
- *
- * Copyright (C) 2013  INRIA.
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
- *
- * @ingroup auto_init
+ * @ingroup sys_auto_init
  * @{
  * @file
  * @brief   initializes any used module that has a trivial init function
  * @author  Oliver Hahm <oliver.hahm@inria.fr>
  * @author  Hauke Petersen <hauke.petersen@fu-berlin.de>
+ * @author  Kaspar Schleiser <kaspar@schleiser.de>
+ * @author  Martine S. Lenders <m.lenders@fu-berlin.de>
  * @}
  */
+
 #include <stdint.h>
 #include <stdio.h>
-
+#include "sched.h"
 #include "auto_init.h"
+#include "auto_init_utils.h"
+#include "auto_init_priorities.h"
+#include "kernel_defines.h"
 
-#ifdef MODULE_CONFIG
-#include "config.h"
-#endif
-
-#ifdef MODULE_SHT11
-#include "sht11.h"
-#endif
-
-#ifdef MODULE_GPIOINT
-#include "gpioint.h"
-#endif
-
-#ifdef MODULE_CC110X_LEGACY_CSMA
-#include "cc110x_legacy_csma.h"
-#endif
-
-#ifdef MODULE_LTC4150
-#include "ltc4150.h"
-#endif
-
-#ifdef MODULE_UART0
-#include "board_uart0.h"
-#endif
-
-#ifdef MODULE_MCI
-#include "diskio.h"
-#endif
-
-#ifdef MODULE_VTIMER
-#include "vtimer.h"
-#endif
-
-#ifdef MODULE_RTC
-#include "periph/rtc.h"
-#endif
-
-#ifdef MODULE_SIXLOWPAN
-#include "sixlowpan.h"
-#endif
-
-#ifdef MODULE_UDP
-#include "udp.h"
-#endif
-
-#ifdef MODULE_TCP
-#include "tcp.h"
-#endif
-
-#ifdef MODULE_NOMAC
-#include "nomac.h"
-#endif
-
-#ifdef MODULE_NET_IF
-#include "cpu_conf.h"
-#include "cpu.h"
-#include "kernel.h"
-#include "net_if.h"
-#include "transceiver.h"
-#include "net_help.h"
-#include "hashes.h"
-#include "periph/cpuid.h"
-#endif
-
-#ifdef MODULE_NG_SIXLOWPAN
-#include "net/ng_sixlowpan.h"
-#endif
-
-#ifdef MODULE_NG_IPV6
-#include "net/ng_ipv6.h"
-#endif
-
-#ifdef MODULE_NG_IPV6_NETIF
-#include "net/ng_ipv6/netif.h"
-#endif
-
-#ifdef MODULE_L2_PING
-#include "l2_ping.h"
-#endif
-
-#ifdef MODULE_NG_PKTDUMP
-#include "net/ng_pktdump.h"
-#endif
-
-#ifdef MODULE_NG_UDP
-#include "net/ng_udp.h"
-#endif
-
-#ifdef MODULE_DEV_ETH_AUTOINIT
-#include "net/dev_eth.h"
-#include "dev_eth_autoinit.h"
-#endif
-
-#ifdef MODULE_FIB
-#include "net/ng_fib.h"
-#endif
-
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG CONFIG_AUTO_INIT_ENABLE_DEBUG
 #include "debug.h"
 
-#ifndef CONF_RADIO_ADDR
-#define CONF_RADIO_ADDR (1)
-#endif
+XFA_INIT_CONST(auto_init_module_t, auto_init_xfa);
 
-#ifndef CONF_PAN_ID
-#define CONF_PAN_ID     (0xabcd)
-#endif
-
-#ifdef MODULE_NET_IF
-void auto_init_net_if(void)
+static inline void _auto_init_module(const volatile auto_init_module_t *module)
 {
-    transceiver_type_t transceivers = 0;
-#ifdef MODULE_AT86RF231
-    transceivers |= TRANSCEIVER_AT86RF231;
+#if IS_ACTIVE(CONFIG_AUTO_INIT_ENABLE_DEBUG)
+    DEBUG("auto_init: %s (%u)\n", module->name, module->prio);
 #endif
-#ifdef MODULE_CC1020
-    transceivers |= TRANSCEIVER_CC1020;
-#endif
-#if (defined(MODULE_CC110X) || defined(MODULE_CC110X_LEGACY) || defined(MODULE_CC110X_LEGACY_CSMA))
-    transceivers |= TRANSCEIVER_CC1100;
-#endif
-#ifdef MODULE_CC2420
-    transceivers |= TRANSCEIVER_CC2420;
-#endif
-#ifdef MODULE_MC1322X
-    transceivers |= TRANSCEIVER_MC1322X;
-#endif
-#ifdef MODULE_NATIVENET
-    transceivers |= TRANSCEIVER_NATIVE;
-#endif
-    net_if_init();
-
-    if (transceivers != 0) {
-#if CPUID_ID_LEN && defined(MODULE_HASHES)
-        uint8_t cpuid[CPUID_ID_LEN];
-
-        cpuid_get(cpuid);
-#endif
-        transceiver_init(transceivers);
-        transceiver_start();
-        int iface = net_if_init_interface(0, transceivers);
-
-#if CPUID_ID_LEN && defined(MODULE_HASHES)
-        net_if_eui64_t eui64;
-        uint32_t hash_h = djb2_hash(cpuid, CPUID_ID_LEN / 2);
-#if CPUID_ID_LEN % 2 == 0
-        uint32_t hash_l = djb2_hash(&(cpuid[CPUID_ID_LEN / 2]),
-                                    CPUID_ID_LEN / 2);
-#else /* CPUID_ID_LEN % 2 == 0 */
-        uint32_t hash_l = djb2_hash(&(cpuid[CPUID_ID_LEN / 2]),
-                                    CPUID_ID_LEN / 2 + 1);
-#endif /* CPUID_ID_LEN % 2 == 0 */
-
-        eui64.uint32[1] = hash_l;
-        eui64.uint32[0] = hash_h;
-
-        /* Set Local/Universal bit to Local since this EUI64 is made up. */
-        eui64.uint8[0] |= 0x02;
-        net_if_set_eui64(iface, &eui64);
-
-#if ENABLE_DEBUG
-        DEBUG("Auto init radio long address on interface %d to ", iface);
-
-        for (size_t i = 0; i < 8; i++) {
-            printf("%02x ", eui64.uint8[i]);
-        }
-
-        DEBUG("\n");
-#endif /* ENABLE_DEBUG */
-
-#undef CONF_RADIO_ADDR
-#if (defined(MODULE_CC110X) || defined(MODULE_CC110X_LEGACY) || defined(MODULE_CC110X_LEGACY_CSMA))
-        uint8_t hwaddr = (uint8_t)((hash_l ^ hash_h) ^ ((hash_l ^ hash_h) >> 24));
-        /* do not combine more parts to keep the propability low that it just
-         * becomes 0xff */
-#else
-        uint16_t hwaddr = HTONS((uint16_t)((hash_l ^ hash_h) ^ ((hash_l ^ hash_h) >> 16)));
-#endif
-        net_if_set_hardware_address(iface, hwaddr);
-        DEBUG("Auto init radio address on interface %d to 0x%04x\n", iface, hwaddr);
-#else /* CPUID_ID_LEN && defined(MODULE_HASHES) */
-
-        if (!net_if_get_hardware_address(iface)) {
-            DEBUG("Auto init radio address on interface %d to 0x%04x\n", iface, CONF_RADIO_ADDR);
-            DEBUG("Change this value at compile time with macro CONF_RADIO_ADDR\n");
-            net_if_set_hardware_address(iface, CONF_RADIO_ADDR);
-        }
-
-#endif /* CPUID_ID_LEN && defined(MODULE_HASHES) */
-
-        if (net_if_set_src_address_mode(iface, NET_IF_TRANS_ADDR_M_SHORT)) {
-            DEBUG("Auto init source address mode to short on interface %d\n",
-                  iface);
-        }
-        else {
-            net_if_set_src_address_mode(iface, NET_IF_TRANS_ADDR_M_LONG);
-            DEBUG("Auto init source address mode to long on interface %d\n",
-                  iface);
-        }
-
-
-        if (net_if_get_pan_id(iface) <= 0) {
-            DEBUG("Auto init PAN ID on interface %d to 0x%04x\n", iface, CONF_PAN_ID);
-            DEBUG("Change this value at compile time with macro CONF_PAN_ID\n");
-            net_if_set_pan_id(iface, CONF_PAN_ID);
-        }
-
-        if (iface >= 0) {
-            DEBUG("Auto init interface %d\n", iface);
-        }
-    }
+    module->init();
 }
-#endif /* MODULE_NET_IF */
+
+#if IS_USED(MODULE_AUTO_INIT_ZTIMER)
+extern void ztimer_init(void);
+AUTO_INIT(ztimer_init,
+          AUTO_INIT_PRIO_MOD_ZTIMER);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_ZTIMER64)
+extern void ztimer64_init(void);
+AUTO_INIT(ztimer64_init,
+          AUTO_INIT_PRIO_MOD_ZTIMER64);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_XTIMER) && !IS_USED(MODULE_ZTIMER_XTIMER_COMPAT)
+extern void xtimer_init(void);
+AUTO_INIT(xtimer_init,
+          AUTO_INIT_PRIO_MOD_XTIMER);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_RANDOM)
+extern void auto_init_random(void);
+AUTO_INIT(auto_init_random,
+          AUTO_INIT_PRIO_MOD_RANDOM);
+#endif
+#if IS_USED(MODULE_SCHEDSTATISTICS)
+extern void init_schedstatistics(void);
+AUTO_INIT(init_schedstatistics,
+          AUTO_INIT_PRIO_MOD_SCHEDSTATISTICS);
+#endif
+#if IS_USED(MODULE_SCHED_ROUND_ROBIN)
+extern void sched_round_robin_init(void);
+AUTO_INIT(sched_round_robin_init,
+          AUTO_INIT_PRIO_MOD_SCHED_ROUND_ROBIN);
+#endif
+#if IS_USED(MODULE_DUMMY_THREAD)
+extern void dummy_thread_create(void);
+AUTO_INIT(dummy_thread_create,
+          AUTO_INIT_PRIO_MOD_DUMMY_THREAD);
+#endif
+#if IS_USED(MODULE_EVENT_THREAD)
+extern void auto_init_event_thread(void);
+AUTO_INIT(auto_init_event_thread,
+          AUTO_INIT_PRIO_MOD_EVENT_THREAD);
+#endif
+#if IS_USED(MODULE_SYS_BUS)
+extern void auto_init_sys_bus(void);
+AUTO_INIT(auto_init_sys_bus,
+          AUTO_INIT_PRIO_MOD_SYS_BUS);
+#endif
+#if IS_USED(MODULE_MCI)
+extern void mci_initialize(void);
+AUTO_INIT(mci_initialize,
+          AUTO_INIT_PRIO_MOD_MCI);
+#endif
+#if IS_USED(MODULE_PROFILING)
+extern void profiling_init(void);
+AUTO_INIT(profiling_init,
+          AUTO_INIT_PRIO_MOD_PROFILING);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_PKTBUF)
+extern void gnrc_pktbuf_init(void);
+AUTO_INIT(gnrc_pktbuf_init,
+          AUTO_INIT_PRIO_MOD_GNRC_PKTBUF);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_PKTDUMP)
+extern void gnrc_pktdump_init(void);
+AUTO_INIT(gnrc_pktdump_init,
+          AUTO_INIT_PRIO_MOD_GNRC_PKTDUMP);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_SIXLOWPAN)
+extern void gnrc_sixlowpan_init(void);
+AUTO_INIT(gnrc_sixlowpan_init,
+          AUTO_INIT_PRIO_MOD_GNRC_SIXLOWPAN);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_IPV6)
+extern kernel_pid_t gnrc_ipv6_init(void);
+AUTO_INIT(gnrc_ipv6_init,
+          AUTO_INIT_PRIO_MOD_GNRC_IPV6);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_UDP)
+extern void gnrc_udp_init(void);
+AUTO_INIT(gnrc_udp_init,
+          AUTO_INIT_PRIO_MOD_GNRC_UDP);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_TCP)
+extern int gnrc_tcp_init(void);
+AUTO_INIT(gnrc_tcp_init,
+          AUTO_INIT_PRIO_MOD_GNRC_TCP);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_LWIP)
+extern void lwip_bootstrap(void);
+AUTO_INIT(lwip_bootstrap,
+          AUTO_INIT_PRIO_MOD_LWIP);
+#endif
+#if IS_USED(MODULE_SOCK_DTLS)
+extern void sock_dtls_init(void);
+AUTO_INIT(sock_dtls_init,
+          AUTO_INIT_PRIO_MOD_SOCK_DTLS);
+#endif
+#if IS_USED(MODULE_OPENTHREAD)
+extern void openthread_bootstrap(void);
+AUTO_INIT(openthread_bootstrap,
+          AUTO_INIT_PRIO_MOD_OPENTHREAD);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_OPENWSN)
+extern void openwsn_bootstrap(void);
+AUTO_INIT(openwsn_bootstrap,
+          AUTO_INIT_PRIO_MOD_OPENWSN);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_MYNEWT_CORE)
+extern void mynewt_core_init(void);
+AUTO_INIT(mynewt_core_init,
+          AUTO_INIT_PRIO_MOD_MYNEWT_CORE);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_UWB_CORE)
+extern void uwb_core_init(void);
+AUTO_INIT(uwb_core_init,
+          AUTO_INIT_PRIO_MOD_UWB_CORE);
+#endif
+#if IS_USED(MODULE_GCOAP) && !IS_ACTIVE(CONFIG_GCOAP_NO_AUTO_INIT)
+extern void gcoap_init(void);
+AUTO_INIT(gcoap_init,
+          AUTO_INIT_PRIO_MOD_GCOAP);
+#endif
+#if IS_USED(MODULE_NANOCOAP_SERVER_AUTO_INIT)
+extern void auto_init_nanocoap_server(void);
+AUTO_INIT(auto_init_nanocoap_server, AUTO_INIT_PRIO_MOD_NANOCOAP);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_UNICOAP)
+extern void unicoap_init(void);
+AUTO_INIT(unicoap_init,
+          AUTO_INIT_PRIO_MOD_UNICOAP);
+#endif
+#if IS_USED(MODULE_DEVFS)
+extern void auto_init_devfs(void);
+AUTO_INIT(auto_init_devfs,
+          AUTO_INIT_PRIO_MOD_DEVFS);
+#endif
+#if IS_USED(MODULE_VFS_AUTO_MOUNT)
+extern void auto_init_vfs(void);
+AUTO_INIT(auto_init_vfs,
+          AUTO_INIT_PRIO_MOD_VFS);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_IPV6_NIB)
+extern void gnrc_ipv6_nib_init(void);
+AUTO_INIT(gnrc_ipv6_nib_init,
+          AUTO_INIT_PRIO_MOD_GNRC_IPV6_NIB);
+#endif
+#if IS_USED(MODULE_SKALD)
+extern void skald_init(void);
+AUTO_INIT(skald_init,
+          AUTO_INIT_PRIO_MOD_SKALD);
+#endif
+#if IS_USED(MODULE_CORD_COMMON)
+extern void cord_common_init(void);
+AUTO_INIT(cord_common_init,
+          AUTO_INIT_PRIO_MOD_CORD_COMMON);
+#endif
+#if IS_USED(MODULE_CORD_EP_STANDALONE)
+extern void cord_ep_standalone_run(void);
+AUTO_INIT(cord_ep_standalone_run,
+          AUTO_INIT_PRIO_MOD_CORD_EP_STANDALONE);
+#endif
+#if IS_USED(MODULE_ASYMCUTE)
+extern void asymcute_handler_run(void);
+AUTO_INIT(asymcute_handler_run,
+          AUTO_INIT_PRIO_MOD_ASYMCUTE);
+#endif
+#if IS_USED(MODULE_ESP_BLE_NIMBLE)
+extern void esp_ble_nimble_init(void);
+AUTO_INIT(esp_ble_nimble_init,
+          AUTO_INIT_PRIO_MOD_ESP_BLE_NIMBLE);
+#endif
+#if IS_USED(MODULE_NIMBLE)
+extern void nimble_riot_init(void);
+AUTO_INIT(nimble_riot_init,
+          AUTO_INIT_PRIO_MOD_NIMBLE);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_LORAMAC)
+extern void auto_init_loramac(void);
+AUTO_INIT(auto_init_loramac,
+          AUTO_INIT_PRIO_MOD_LORAMAC);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_RADIOLIB)
+extern void auto_init_radiolib(void);
+AUTO_INIT(auto_init_radiolib,
+          AUTO_INIT_PRIO_MOD_RADIOLIB);
+#endif
+#if IS_USED(MODULE_DSM)
+extern void dsm_init(void);
+AUTO_INIT(dsm_init,
+          AUTO_INIT_PRIO_MOD_DSM);
+#endif
+/* initialize USB devices */
+#if IS_USED(MODULE_AUTO_INIT_USBUS)
+extern void auto_init_usb(void);
+AUTO_INIT(auto_init_usb,
+          AUTO_INIT_PRIO_MOD_USBUS);
+#endif
+/* initialize network devices */
+#if IS_USED(MODULE_AUTO_INIT_GNRC_NETIF)
+extern void gnrc_netif_init_devs(void);
+AUTO_INIT(gnrc_netif_init_devs,
+          AUTO_INIT_PRIO_MOD_GNRC_NETIF);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_UHCPC)
+extern void auto_init_gnrc_uhcpc(void);
+AUTO_INIT(auto_init_gnrc_uhcpc,
+          AUTO_INIT_PRIO_MOD_GNRC_UHCPC);
+#endif
+/* initialize NDN module after the network devices are initialized */
+#if IS_USED(MODULE_NDN_RIOT)
+extern void ndn_init(void);
+AUTO_INIT(ndn_init,
+          AUTO_INIT_PRIO_MOD_NDN);
+#endif
+/* initialize sensors and actuators */
+#if IS_USED(MODULE_SHT1X)
+/* The sht1x module needs to be initialized regardless of SAUL being used,
+ * as the shell commands rely on auto-initialization. auto_init_sht1x also
+ * performs SAUL registration, but only if module auto_init_saul is used.
+ */
+extern void auto_init_sht1x(void);
+AUTO_INIT(auto_init_sht1x,
+          AUTO_INIT_PRIO_MOD_SHT1X);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_SAUL)
+extern void saul_init_devs(void);
+AUTO_INIT(saul_init_devs,
+          AUTO_INIT_PRIO_MOD_SAUL);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_GNRC_RPL)
+extern void auto_init_gnrc_rpl(void);
+AUTO_INIT(auto_init_gnrc_rpl,
+          AUTO_INIT_PRIO_MOD_GNRC_RPL);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_CAN)
+extern void auto_init_candev(void);
+AUTO_INIT(auto_init_candev,
+          AUTO_INIT_PRIO_MOD_CAN);
+#endif
+#if IS_USED(MODULE_SUIT)
+extern void suit_init_conditions(void);
+AUTO_INIT(suit_init_conditions,
+          AUTO_INIT_PRIO_MOD_SUIT);
+#endif
+#if IS_USED(MODULE_MBEDTLS)
+extern void auto_init_mbedtls(void);
+AUTO_INIT(auto_init_mbedtls,
+          AUTO_INIT_PRIO_MOD_MBEDTLS);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_SECURITY)
+extern void auto_init_security(void);
+AUTO_INIT(auto_init_security,
+          AUTO_INIT_PRIO_MOD_SECURITY);
+#endif
+#if IS_USED(MODULE_DRIVER_CRYPTOCELL_310)
+extern void driver_cryptocell_310_setup(void);
+AUTO_INIT(driver_cryptocell_310_setup,
+          AUTO_INIT_PRIO_MOD_DRIVER_CRYPTOCELL_310);
+#endif
+#if IS_USED(MODULE_TEST_UTILS_INTERACTIVE_SYNC) && !IS_USED(MODULE_SHELL)
+extern void test_utils_interactive_sync(void);
+AUTO_INIT(test_utils_interactive_sync,
+          AUTO_INIT_PRIO_MOD_TEST_UTILS_INTERACTIVE_SYNC);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_DHCPV6_CLIENT)
+extern void dhcpv6_client_auto_init(void);
+AUTO_INIT(dhcpv6_client_auto_init,
+          AUTO_INIT_PRIO_MOD_DHCPV6_CLIENT);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_DHCPV6_RELAY)
+extern void dhcpv6_relay_auto_init(void);
+AUTO_INIT(dhcpv6_relay_auto_init,
+          AUTO_INIT_PRIO_MOD_DHCPV6_RELAY);
+#endif
+#if IS_USED(MODULE_GNRC_DHCPV6_CLIENT_SIMPLE_PD)
+extern void gnrc_dhcpv6_client_simple_pd_init(void);
+AUTO_INIT(gnrc_dhcpv6_client_simple_pd_init,
+          AUTO_INIT_PRIO_MOD_DHCPV6_CLIENT_SIMPLE_PD);
+#endif
+#if IS_USED(MODULE_GNRC_IPV6_AUTO_SUBNETS_AUTO_INIT)
+extern void gnrc_ipv6_auto_subnets_init(void);
+AUTO_INIT(gnrc_ipv6_auto_subnets_init,
+          AUTO_INIT_PRIO_MOD_GNRC_IPV6_AUTO_SUBNETS);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_TELNET)
+extern void telnet_server_start(void);
+AUTO_INIT(telnet_server_start,
+          AUTO_INIT_PRIO_MOD_TELNET);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_MULTIMEDIA)
+#if IS_USED(MODULE_DFPLAYER)
+extern void auto_init_dfplayer(void);
+AUTO_INIT(auto_init_dfplayer,
+          AUTO_INIT_PRIO_MOD_DFPLAYER);
+#endif
+#endif
+#if IS_USED(MODULE_AUTO_INIT_SCREEN)
+extern void auto_init_screen(void);
+AUTO_INIT(auto_init_screen,
+          AUTO_INIT_PRIO_MOD_SCREEN);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_BENCHMARK_UDP)
+extern void benchmark_udp_auto_init(void);
+AUTO_INIT(benchmark_udp_auto_init,
+          AUTO_INIT_PRIO_MOD_BENCHMARK_UDP);
+#endif
+#if IS_USED(MODULE_AUTO_INIT_SOCK_DNS)
+extern void auto_init_sock_dns(void);
+AUTO_INIT(auto_init_sock_dns,
+          AUTO_INIT_PRIO_MOD_DOCK_DNS);
+#endif
+#if IS_USED(MODULE_GNRC_IPV6_STATIC_ADDR)
+extern void auto_init_gnrc_ipv6_static_addr(void);
+AUTO_INIT(auto_init_gnrc_ipv6_static_addr,
+          AUTO_INIT_PRIO_MOD_GNRC_IPV6_STATIC_ADDR);
+#endif
+#if IS_USED(MODULE_PSA_CRYPTO)
+extern void psa_crypto_init(void);
+AUTO_INIT(psa_crypto_init,
+          AUTO_INIT_PRIO_MOD_PSA_CRYPTO);
+#endif
+#if IS_USED(MODULE_SLIPMUX) && !IS_USED(MODULE_SLIPDEV_NET)
+extern void slipmux_init(void);
+AUTO_INIT(slipmux_init, AUTO_INIT_PRIO_MOD_SLIPDEV);
+#endif
 
 void auto_init(void)
 {
-#ifdef MODULE_CONFIG
-    DEBUG("Auto init loading config\n");
-    config_load();
-#endif
-
-#ifdef MODULE_VTIMER
-    DEBUG("Auto init vtimer module.\n");
-    vtimer_init();
-#endif
-#ifdef MODULE_UART0
-    DEBUG("Auto init uart0 module.\n");
-    board_uart0_init();
-#endif
-#ifdef MODULE_RTC
-    DEBUG("Auto init rtc module.\n");
-    rtc_init();
-#endif
-#ifdef MODULE_SHT11
-    DEBUG("Auto init SHT11 module.\n");
-    sht11_init();
-#endif
-#ifdef MODULE_GPIOINT
-    DEBUG("Auto init gpioint module.\n");
-    gpioint_init();
-#endif
-#ifdef MODULE_CC110X_LEGACY_CSMA
-    DEBUG("Auto init CC1100 module.\n");
-#ifndef MODULE_TRANSCEIVER
-    cc1100_init();
-#endif
-#endif
-#ifdef MODULE_LTC4150
-    DEBUG("Auto init ltc4150 module.\n");
-    ltc4150_init();
-#endif
-#ifdef MODULE_MCI
-    DEBUG("Auto init mci module.\n");
-    MCI_initialize();
-#endif
-#ifdef MODULE_L2_PING
-    DEBUG("Auto init net_if module.\n");
-    l2_ping_init();
-#endif
-#ifdef MODULE_NOMAC
-    DEBUG("Auto init nomac module.\n");
-    nomac_init_module();
-#endif
-#ifdef MODULE_NET_IF
-    DEBUG("Auto init net_if module.\n");
-    auto_init_net_if();
-#endif
-#ifdef MODULE_SIXLOWPAN
-    DEBUG("Auto init 6LoWPAN module.\n");
-    sixlowpan_lowpan_init();
-#endif
-#ifdef MODULE_PROFILING
-    extern void profiling_init(void);
-    profiling_init();
-#endif
-#ifdef MODULE_UDP
-    DEBUG("Auto init transport layer module: [udp].\n");
-    udp_init_transport_layer();
-#endif
-
-#ifdef MODULE_TCP
-    DEBUG("Auto init transport layer module: [tcp].\n");
-    tcp_init_transport_layer();
-#endif
-#ifdef MODULE_NG_PKTDUMP
-    DEBUG("Auto init ng_pktdump module.\n");
-    ng_pktdump_init();
-#endif
-#ifdef MODULE_NG_SIXLOWPAN
-    DEBUG("Auto init ng_sixlowpan module.\n");
-    ng_sixlowpan_init();
-#endif
-#ifdef MODULE_NG_IPV6
-    DEBUG("Auto init ng_ipv6 module.\n");
-    ng_ipv6_init();
-#endif
-#ifdef MODULE_NG_UDP
-    DEBUG("Auto init UDP module.\n");
-    ng_udp_init();
-#endif
-#ifdef MODULE_FIB
-    DEBUG("Auto init FIB module.\n");
-    fib_init();
-#endif
-
-
-/* initialize network devices */
-#ifdef MODULE_AUTO_INIT_NG_NETIF
-
-#ifdef MODULE_NG_AT86RF2XX
-    extern void auto_init_ng_at86rf2xx(void);
-    auto_init_ng_at86rf2xx();
-#endif
-
-#ifdef MODULE_XBEE
-    extern void auto_init_xbee(void);
-    auto_init_xbee();
-#endif
-
-#ifdef MODULE_KW2XRF
-    extern void auto_init_kw2xrf(void);
-    auto_init_kw2xrf();
-#endif
-
-#ifdef MODULE_NG_NETDEV_ETH
-    extern void auto_init_ng_netdev_eth(void);
-    auto_init_ng_netdev_eth();
-#endif
-
-#endif /* MODULE_AUTO_INIT_NG_NETIF */
-
-#ifdef MODULE_NG_IPV6_NETIF
-    ng_ipv6_netif_init_by_dev();
-#endif
+    for (unsigned i = 0; i < XFA_LEN(auto_init_module_t, auto_init_xfa); i++) {
+        _auto_init_module(&auto_init_xfa[i]);
+    }
 }

@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "GNRC Packet Dump"
+    depends on USEMODULE_GNRC_PKTDUMP
+
+config GNRC_PKTDUMP_MSG_QUEUE_SIZE_EXP
+    int "Exponent for the queue size (resulting in the queue size 2^n)"
+    default 3
+    help
+        As the queue size ALWAYS needs to be power of two, this option
+        represents the exponent of 2^n, which will be used as the size of
+        the queue.
+
+endmenu # GNRC Packet Dump

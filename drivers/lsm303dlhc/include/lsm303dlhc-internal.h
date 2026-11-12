@@ -1,13 +1,12 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @ingroup     driver_lsm303dlhc
+ * @ingroup     drivers_lsm303dlhc
  *
  * @{
  *
@@ -16,9 +15,6 @@
  *
  * @author      Thomas Eichinger <thomas.eichinger@fu-berlin.de>
  */
-
-#ifndef LSM303DLHC_INTERNAL_H
-#define LSM303DLHC_INTERNAL_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,7 +99,7 @@ extern "C" {
 #define LSM303DLHC_STATUS_ZDA               (0x04)
 #define LSM303DLHC_STATUS_YDA               (0x02)
 #define LSM303DLHC_STATUS_XDA               (0x01)
-/** *} */
+/** @} */
 
 /**
  * @name Masks for the LSM303DLHC CTRL4_A register
@@ -174,5 +170,4 @@ extern "C" {
 }
 #endif
 
-#endif /* LSM303DLHC_INTERNAL_H */
 /** @} */

@@ -1,13 +1,12 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @ingroup     driver_l3g4200d
+ * @ingroup     drivers_l3g4200d
  * @{
  *
  * @file
@@ -16,21 +15,17 @@
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef L3G4200D_REGS_H
-#define L3G4200D_REGS_H
-
-
 #ifdef __cplusplus
  extern "C" {
 #endif
 
 /**
- * @brief Flag for reading multiple bytes
+ * @brief   Flag for reading multiple bytes
  */
 #define L3G4200D_AUTOINC                0x80
 
 /**
- * @name L3G4200D register definitions
+ * @name    L3G4200D register definitions
  * @{
  */
 #define L3G4200D_REG_WHO_AM_I           0x0f
@@ -62,7 +57,7 @@
 /** @} */
 
 /**
- * @name CTRL1 bitfields
+ * @name    CTRL1 bitfields
  * @{
  */
 #define L3G4200D_CTRL1_PD               0x08
@@ -74,7 +69,8 @@
 /** @} */
 
 /**
- * @name CTRL4 bitfields
+ * @name    CTRL4 bitfields
+ * @{
  */
 #define L3G4200D_CTRL4_BDU              0x80
 #define L3G4200D_CTRL4_BLE              0x40
@@ -90,5 +86,4 @@
 }
 #endif
 
-#endif /* L3G4200D_REGS_H */
 /** @} */

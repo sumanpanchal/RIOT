@@ -1,0 +1,10 @@
+/*
+ * SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+/**
+ * @defgroup    net_sock_conf SOCK compile configurations
+ * @ingroup     config
+ * @brief       Group of compile time configurations related to SOCK
+ */

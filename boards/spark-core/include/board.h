@@ -1,15 +1,12 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser General
- * Public License v2.1. See the file LICENSE in the top level directory for more
- * details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    boards_spark-core Spark-Core
- * @ingroup     boards
- * @brief       Board specific files for the spark-core board.
+ * @ingroup     boards_spark-core
  * @{
  *
  * @file
@@ -17,9 +14,6 @@
  *
  * @author      Christian Mehlis <mehlis@inf.fu-berlin.de>
  */
-
-#ifndef BOARD_H_
-#define BOARD_H_
 
 #include <stdint.h>
 
@@ -31,94 +25,60 @@
 #endif
 
 /**
- * @name Define the nominal CPU core clock in this board
+ * @name Tell the xtimer that we use a 16-bit peripheral timer
  */
-#define F_CPU               CLOCK_CORECLOCK
+#define XTIMER_WIDTH        (16)
 
 /**
- * @name Define the location of the RIOT image in flash
- */
-#define LOCATION_VTABLE     (0x08005000)
-
-/**
- * @name Define the UART to be used as stdio and its baudrate
+ * @name    Macros for controlling the on-board LEDs
  * @{
  */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      (115200)
-#define STDIO_RX_BUFSIZE    (64U)
-/** @} */
+#define LED0_PIN_NUM        9
+#define LED0_PORT           GPIO_PORT_A /**< GPIO port of LED 0 */
+#define LED0_PORT_NUM       PORT_A
 
-/**
- * @name Assign the hardware timer
- */
-#define HW_TIMER            TIMER_0
+#define LED1_PIN_NUM        10
+#define LED1_PORT           GPIO_PORT_A /**< GPIO port of LED 1 */
+#define LED1_PORT_NUM       PORT_A
 
-/**
- * @name LED pin definitions
- * @{
- */
-#define LED_PORT            (GPIOA)
-#define LED_RED_PIN         (9)
-#define LED_GREEN_PIN       (10)
-#define LED_BLUE_PIN        (8)
-#define LED_WHITE_PIN       (13)
-/** @} */
+#define LED2_PIN_NUM        8
+#define LED2_PORT           GPIO_PORT_A /**< GPIO port of LED 2 */
+#define LED2_PORT_NUM       PORT_A
 
-/**
- * @name Macros for controlling the on-board LEDs.
- * @{
- */
-#define LED_RED_ON          (LED_PORT->BRR = (1<<LED_RED_PIN))
-#define LED_RED_OFF         (LED_PORT->BSRR = (1<<LED_RED_PIN))
-#define LED_RED_TOGGLE      (LED_PORT->ODR ^= (1<<LED_RED_PIN))
-#define LED_GREEN_ON        (LED_PORT->BRR = (1<<LED_GREEN_PIN))
-#define LED_GREEN_OFF       (LED_PORT->BSRR = (1<<LED_GREEN_PIN))
-#define LED_GREEN_TOGGLE    (LED_PORT->ODR ^= (1<<LED_GREEN_PIN))
-#define LED_BLUE_ON         (LED_PORT->BRR = (1<<LED_BLUE_PIN))
-#define LED_BLUE_OFF        (LED_PORT->BSRR = (1<<LED_BLUE_PIN))
-#define LED_BLUE_TOGGLE     (LED_PORT->ODR ^= (1<<LED_BLUE_PIN))
-#define LED_WHITE_ON        (LED_PORT->BRR = (1<<LED_WHITE_PIN))
-#define LED_WHITE_OFF       (LED_PORT->BSRR = (1<<LED_WHITE_PIN))
-#define LED_WHITE_TOGGLE    (LED_PORT->ODR ^= (1<<LED_WHITE_PIN))
+#define LED3_PIN_NUM        13
+#define LED3_PORT           GPIO_PORT_A /**< GPIO port of LED 3 */
+#define LED3_PORT_NUM       PORT_A
 /** @} */
 
 /**
  * @name User button configuration
+ * @{
  */
-#define BUTTON1             GPIO_0
+#define BUTTON1             GPIO_PIN(PORT_B, 2)
+/** @} */
 
 /**
  * @name CC3000 pin configuration
  * @{
  */
-#define CC3000_SPI          SPI_0
-#define CC3000_CS           GPIO_1
-#define CC3000_EN           GPIO_2
-#define CC3000_INT          GPIO_3
+#define CC3000_SPI          SPI_DEV(0)
+#define CC3000_CS           GPIO_PIN(PORT_B, 12)
+#define CC3000_EN           GPIO_PIN(PORT_B, 8)
+#define CC3000_INT          GPIO_PIN(PORT_B, 11)
 /** @} */
 
 /**
  * @name EXTFLASH pin configuration
  * @{
  */
-#define EXTFLASH_SPI        SPI_0
-#define EXTFLASH            GPIO_4
+#define EXTFLASH_SPI        SPI_DEV(0)
+#define EXTFLASH            GPIO_PIN(PORT_B, 9)
 /** @} */
-
-/**
- * Define the type for the radio packet length for the transceiver
- */
-typedef uint8_t radio_packet_length_t;
-
-/**
- * @brief Initialize board specific hardware, including clock, LEDs and std-IO
- */
-void board_init(void);
 
 #ifdef __cplusplus
 } /* end extern "C" */
 #endif
 
-#endif /* BOARD_H_ */
+#include "stm32_leds.h"
+
 /** @} */

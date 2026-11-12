@@ -1,10 +1,7 @@
 #!/bin/sh
 
-# Copyright (C) 2014 Freie Universität Berlin
-#
-# This file is subject to the terms and conditions of the GNU Lesser
-# General Public License v2.1. See the file LICENSE in the top level
-# directory for more details.
+# SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+# SPDX-License-Identifier: LGPL-2.1-only
 
 # mbed devices are detected ass mass storage devices. To upload
 # a new firmware, simply copy your binary onto this device and
@@ -20,6 +17,8 @@
 
 OS=`uname`
 DID_MOUNT=false
+
+BINFILE=$1
 
 # set the mount path depending on the OS
 if [ ${OS} = "Linux" ]
@@ -55,8 +54,8 @@ fi
 # remove old binary
 rm -f ${MOUNT}/*.bin
 # copy new binary to device
-cp ${HEXFILE} ${MOUNT}
-# make sure hexfile was written
+cp ${BINFILE} ${MOUNT}
+# make sure binary was written
 sync
 
 # unmount the device if we have manually mounted it before
@@ -66,5 +65,5 @@ then
 fi
 
 echo ""
-echo "UPLOAD SUCCESFUL"
+echo "UPLOAD SUCCESSFUL"
 echo ""

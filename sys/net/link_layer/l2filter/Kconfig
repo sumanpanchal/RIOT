@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "L2filter"
+    depends on USEMODULE_L2FILTER
+
+config L2FILTER_ADDR_MAXLEN
+    int "Maximum length of addresses that can be stored in the filter list"
+    default 8
+
+config L2FILTER_LISTSIZE
+    int "Number of slots in each filter list (filter entries per device)"
+    default 8
+
+endmenu # L2filter

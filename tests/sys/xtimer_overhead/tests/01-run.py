@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2019 Kaspar Schleiser <kaspar@schleiser.de>
+# SPDX-License-Identifier: LGPL-2.1-only
+
+import sys
+from testrunner import run
+
+
+def testfunc(child):
+    child.expect(r"min=-?\d+ max=-?\d+ avg_diff=\d+\r\n")
+
+
+if __name__ == "__main__":
+    sys.exit(run(testfunc))

@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2021 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_PSA_CRYPTO
+
+rsource "Kconfig.keys"
+
+rsource "psa_se_mgmt/Kconfig"
+
+endif # USEMODULE_PSA_CRYPTO

@@ -20,10 +20,21 @@
 
 MEMORY
 {
-    rom (rx)        : ORIGIN = 0x00000000, LENGTH = 512K
-    ram (rwx)       : ORIGIN = 0x100000C8, LENGTH = (32K - 0xC8)
-    usb_ram (rwx)   : ORIGIN = 0x2007C000, LENGTH = 16K
-    eth_ram (rwx)   : ORIGIN = 0x20080000, LENGTH = 16K
+    usb_ram         : ORIGIN = 0x2007C000, LENGTH = 16K
+    eth_ram         : ORIGIN = 0x20080000, LENGTH = 16K
 }
 
-INCLUDE cortexm_base.ld
+SECTIONS
+{
+    .usb_ram (NOLOAD) :
+    {
+        *(.usb_ram .usb_ram.*)
+    } > usb_ram
+
+    .eth_ram (NOLOAD) :
+    {
+        *(.eth_ram .eth_ram.*)
+    } > eth_ram
+}
+
+INCLUDE cortexm.ld

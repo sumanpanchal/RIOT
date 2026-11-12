@@ -1,13 +1,21 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# Copyright 2014 Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
-#
-# This file is subject to the terms and conditions of the GNU Lesser
-# General Public License v2.1. See the file LICENSE in the top level
-# directory for more details.
+# SPDX-FileCopyrightText: 2017 Kaspar Schleiser <kaspar@schleiser.de>
+# SPDX-FileCopyrightText: 2014 Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
+# SPDX-FileCopyrightText: 2026 Karl Fessel
+# SPDX-License-Identifier: LGPL-2.1-only
+
+SCRIPTREALDIR=$(realpath "$(dirname "${0}")")
+
+: "${RIOTBASE:=$(cd "$(dirname "$0")"/../../../ || exit 1; pwd)}"
+cd "$RIOTBASE" || exit 1
+
+: "${RIOTTOOLS:=${RIOTBASE}/dist/tools}"
+# shellcheck source=/dev/null
+. "${RIOTTOOLS}"/ci/changed_files.sh
 
 # customizable
-CHECKROOT=$(dirname "${0}")
+CHECKROOT="${SCRIPTREALDIR}"
 LICENSEDIR="${CHECKROOT}/patterns"
 OUTPUT="${CHECKROOT}/out"
 UNKNOWN="${OUTPUT}/unknown"
@@ -18,57 +26,49 @@ TAB_CHAR="$(printf '\t')"
 
 # prepare
 ROOT=$(git rev-parse --show-toplevel)
-LICENSES=$(ls "${LICENSEDIR}")
+# put the SPDX patterns first to speed up the loop below
+LICENSES=$(find "${LICENSEDIR}" -type f -iname 'spdx*' -printf '%f ')
+LICENSES=${LICENSES}$(find "${LICENSEDIR}" -type f ! -iname 'spdx*' -printf '%f ')
+
 EXIT_CODE=0
-ERROR_EXIT_CODE="1"
+
+: "${ERROR_EXIT_CODE:=1}"
 
 # reset output dir
 rm -fr "${OUTPUT}"
 mkdir -p "${OUTPUT}"
+
+# prepare license patterns
+declare -A PATTERNS
 for LICENSE in ${LICENSES}; do
     echo -n '' > "${OUTPUT}/${LICENSE}"
+    PATTERNS[${LICENSE}]="$(grep -v '^$' "${LICENSEDIR}/${LICENSE}" | \
+        paste -sd' ' | sed -e 's/[[:space:]][[:space:]]*/ /g')"
 done
 
-# If no branch but an option is given, unset BRANCH.
-# Otherwise, consume this parameter.
-BRANCH="${1}"
-if echo "${BRANCH}" | grep -q '^-'; then
-    BRANCH=""
-else
-    if [ -n "${BRANCH}" ]; then
-        shift 1
-    fi
-fi
-
-# If the --diff-filter option is given, consume this parameter.
-# Set the default DIFFFILTER option otherwise.
-DIFFFILTER="${1}"
-if echo "${DIFFFILTER}" | grep -q '^--diff-filter='; then
-    shift 1
-else
-    DIFFFILTER="--diff-filter=ACMR"
-fi
-
-# If the --error-exitcode option is given, consume this parameter
-# and overwrite the default ERROR_EXIT_CODE.
-if echo "${1}" | grep -q '^--error-exitcode='; then
-    ERROR_EXIT_CODE=$(echo ${1} | sed -e 's/--error-exitcode=//')
-    shift 1
-fi
-
-# select files to check
-if [ -z "${BRANCH}" ]; then
-    FILES="$(git ls-tree -r --full-tree --name-only HEAD | grep -E '\.([sSch]|cpp)$')"
-else
-    FILES="$(git diff ${DIFFFILTER} --name-only ${BRANCH} | grep -E '\.([sSchp]|cpp)$')"
-fi
+FILES=$(FILEREGEX='\.([sSch]|cpp)$' changed_files)
+NEW_FILES=$(FILEREGEX='\.([sSch]|cpp)$' DIFFFILTER='AC' changed_files)
 
 # categorize files
 for FILE in ${FILES}; do
+    EXCLUDED=0
+    while IFS= read -r EXCLUDED_FILE; do
+        # ignore comment lines
+        if [[ "${EXCLUDED_FILE}" =~ ^\s*"#" ]]; then
+            continue
+        fi
+        if [ "${FILE}" = "${EXCLUDED_FILE}" ]; then
+            EXCLUDED=1
+        fi
+    done < "${SCRIPTREALDIR}/excluded_files"
+    if [ "${EXCLUDED}" -eq 1 ]; then
+        continue
+    fi
     FAIL=1
-    head -100 "${ROOT}/${FILE}" | sed -e 's/[\/\*'"${TAB_CHAR}"']/ /g' -e 's/$/ /' | tr -d '\r\n' | sed -e 's/  */ /g' > "${TMP}"
+    head -100 "${ROOT}/${FILE}" | sed -e 's/[\/\*'"${TAB_CHAR}"']/ /g' | \
+        paste -sd' ' | sed -e 's/[[:space:]][[:space:]]*/ /g' > "${TMP}"
     for LICENSE in ${LICENSES}; do
-        if pcregrep -q -f "${LICENSEDIR}/${LICENSE}" "${TMP}"; then
+        if grep -qE "${PATTERNS[${LICENSE}]}" "${TMP}"; then
             echo "${FILE}" >> "${OUTPUT}/${LICENSE}"
             FAIL=0
             break
@@ -77,8 +77,11 @@ for FILE in ${FILES}; do
     if [ ${FAIL} = 1 ]; then
         echo "${FILE}" >> "${UNKNOWN}"
         echo "file has an unknown license header: '${FILE}'"
-        EXIT_CODE=${ERROR_EXIT_CODE}
+        # only fail the check for files added in this branch
+        if echo "${NEW_FILES}" | grep -qxF "${FILE}"; then
+            EXIT_CODE=${ERROR_EXIT_CODE}
+        fi
     fi
 done
 
-exit ${EXIT_CODE}
+exit "${EXIT_CODE}"

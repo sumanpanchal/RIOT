@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 René Kijewski <rene.kijewski@fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -14,11 +13,8 @@
  * @note    Do not include this header file directly, but pthread.h.
  */
 
-#ifndef __SYS__POSIX__PTHREAD_RWLOCK__H
-#define __SYS__POSIX__PTHREAD_RWLOCK__H
-
 #include "priority_queue.h"
-#include "tcb.h"
+#include "thread.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -34,7 +30,7 @@ extern "C" {
  *            E.g. no new readers will get into the critical section
  *            if a writer of the same or a higher priority already waits for the lock.
  */
-typedef struct pthread_rwlock
+typedef struct
 {
     /**
      * @brief     The current amount of reader inside the critical section.
@@ -59,12 +55,11 @@ typedef struct pthread_rwlock
 /**
  * @brief     Internal structure that stores one waiting thread.
  */
-typedef struct __pthread_rwlock_waiter_node
-{
-    bool is_writer; /**< `false`: reader; `true`: writer */
-    tcb_t *thread; /**< waiting thread */
-    priority_queue_node_t qnode; /**< Node to store in `pthread_rwlock_t::queue`. */
-    bool continue_; /**< This is not a spurious wakeup. */
+typedef struct {
+    bool is_writer;                 /**< `false`: reader; `true`: writer */
+    thread_t *thread;               /**< waiting thread */
+    priority_queue_node_t qnode;    /**< Node to store in `pthread_rwlock_t::queue`. */
+    bool continue_;                 /**< This is not a spurious wakeup. */
 } __pthread_rwlock_waiter_node_t;
 
 /**
@@ -175,8 +170,6 @@ bool __pthread_rwlock_blocked_writingly(const pthread_rwlock_t *rwlock);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

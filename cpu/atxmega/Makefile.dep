@@ -1,0 +1,12 @@
+# peripheral drivers are linked into the final binary
+USEMODULE += atxmega_periph
+
+ifneq (,$(filter periph_cpuid,$(USEMODULE)))
+  USEMODULE += periph_nvm
+endif
+
+ifneq (,$(findstring a1,$(call chars_from,8,$(CPU_MODEL))))
+  USEMODULE += atxmega_ebi
+endif
+
+include $(RIOTCPU)/avr8_common/Makefile.dep

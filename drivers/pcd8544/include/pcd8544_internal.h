@@ -1,13 +1,12 @@
 /*
- * Copyright (C) 2015 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2015 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @ingroup     driver_pcd8544
+ * @ingroup     drivers_pcd8544
  *
  * @{
  *
@@ -16,9 +15,6 @@
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
-
-#ifndef PDC8544_INTERNAL_H
-#define PDC8544_INTERNAL_H
 
 #ifdef __cplusplus
  extern "C" {
@@ -30,7 +26,7 @@
 #define RESET_DELAY         (5000)  /* keep reset low for 5ms */
 
 /**
- * @brief   Communication modes: command or data
+ * @name    Communication modes: command or data
  * @{
  */
 #define MODE_CMD            (0)     /**< we are sending a command */
@@ -38,7 +34,7 @@
 /** @} */
 
 /**
- * @brief   Maximum parameter values
+ * @name    Maximum parameter values
  * @{
  */
 #define CONTRAST_MAX        (127U)  /**< maximum possible contrast value */
@@ -47,7 +43,7 @@
 /** @} */
 
 /**
- * @brief   Display commands
+ * @name    Display commands
  * @{
  */
 #define CMD_DISABLE         (0x24)  /**< set LCD into power down mode */
@@ -72,5 +68,4 @@
 }
 #endif
 
-#endif /* PDC8544_INTERNAL_H */
 /** @} */

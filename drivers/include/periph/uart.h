@@ -1,183 +1,474 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014-2015 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    driver_periph_uart UART
- * @ingroup     driver_periph
+ * @defgroup    drivers_periph_uart UART
+ * @ingroup     drivers_periph
  * @brief       Low-level UART peripheral driver
+ *
+ * This is a basic UART (Universal Asynchronous Receiver Transmitter) interface
+ * to allow platform independent access to the MCU's serial communication
+ * abilities. This interface is intentionally designed to be as simple as
+ * possible, to allow for easy implementation and maximum portability.
+ *
+ * The simple interface provides capabilities to initialize and configure
+ * the serial communication module, which automatically enables for receiving
+ * data, as well as writing data to the UART port, which means transmitting
+ * data.
+ *
+ * # Default Configuration and Dealing with Multiple UARTs
+ *
+ * Many advanced microcontrollers feature multiple UARTs and some devices,
+ * such as the Nordic Semiconductor nRF52 family, even allow arbitrary pin
+ * assignments for the peripherals.
+ *
+ * RIOT boards provide sane defaults for bus and pin assignments on Development
+ * Boards. The first UART `UART_DEV(0)` is assigned to
+ * the UART pins marked on the board (RX and TX). Often that corresponds to the
+ * Arduino headers or other manufacturer standardized pinouts.
+ * By default the @p UART_DEV(0) device of each board is initialized and mapped
+ * to STDIO in RIOT which is used for standard input/output functions like
+ * `printf()` or `puts()` with a default baudrate of 115200 and 8-N-1 mode.
+ *
+ * If there are additional UARTs present and logically accessible on the board,
+ * you can access them with `UART_DEV(1)`, `UART_DEV(2)`, etc.
+ * Usually not all UARTs are configured for all boards.
+ * The exact assignment depends on the number of UARTs and
+ * organization of peripherals as well as the capabilities of the individual
+ * controller. Some controllers support faster transfer rate or special
+ * operating modes. More details are documented in the
+ * `periph_conf.h` file of the specific board.
+ *
+ * If you wish to modify the default configuration for your application,
+ * take a look at the
+ * [guides page](https://doc.riot-os.org/advanced_tutorials/creating_application/#modifying-board-defaults-of-peripherals)
+ * about creating applications.
+ *
+ * # Using the additional UART(s)
+ *
+ * As the UARTs other than the default `UART_DEV(0)`, are typically not
+ * configured yet, you need to select the
+ * symbol rate for initialization which is typically {9600, 19200, 38400, 57600,
+ * 115200} baud. Additionally, you should register a callback function that is
+ * executed in interrupt context when data is being received. The driver will
+ * then read the received data byte, call the registered callback function and
+ * pass the received data to it via its argument. The interface enforces the
+ * receiving to be implemented in an interrupt driven mode. Thus, you never know
+ * how many bytes are going to be received and might want to handle that in your
+ * specific callback function. The transmit function can be implemented in any
+ * way. You can also configure parity, the number of data and stop bits, i.e.
+ * such combinations as 8-E-1, 7-N-2 etc. 8-N-1 mode is set by default.
+ *
+ * # (Low-) Power Implications
+ *
+ * After initialization, the UART peripheral **should** be powered on and
+ * active. The UART can later be explicitly put to sleep and woken up by calling
+ * the uart_poweron() and uart_poweroff() functions. Once woken up using
+ * uart_poweron(), the UART **should** transparently continue it's previously
+ * configured operation.
+ *
+ * While the UART is active, the implementation might need to block certain
+ * power states.
+ *
  * @{
  *
  * @file
- * @brief       Low-level UART peripheral driver interface definitions
+ * @brief       Low-level UART peripheral driver interface definition
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef PERIPH_UART_H
-#define PERIPH_UART_H
-
+#include <errno.h>
+#include <limits.h>
+#include <stddef.h>
 #include <stdint.h>
 
+#include "periph_cpu.h"
 #include "periph_conf.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* guard file in case no UART device was specified */
-#if UART_NUMOF
-
 /**
- * @brief Definition of available UART devices
- *
- * To this point a maximum of 4 UART devices would be available,
- * this should be enough for most applications?!
+ * @brief   Threshold under which polling transfers are used instead of DMA
+ *          TODO: determine at run-time based on baudrate
  */
-typedef enum {
-#if UART_0_EN
-    UART_0 = 0,             /**< UART channel 0 */
+#ifndef CONFIG_UART_DMA_THRESHOLD_BYTES
+#define CONFIG_UART_DMA_THRESHOLD_BYTES 8
 #endif
-#if UART_1_EN
-    UART_1,                 /**< UART channel 1 */
-#endif
-#if UART_2_EN
-    UART_2,                 /**< UART channel 2 */
-#endif
-#if UART_3_EN
-    UART_3,                 /**< UART channel 3 */
-#endif
-} uart_t;
 
 /**
- * @brief Signature for receive interrupt callback
+ * @brief   Define default UART type identifier
+ */
+#ifndef HAVE_UART_T
+typedef uint_fast8_t uart_t;
+#endif
+
+/**
+ * @brief   Default UART undefined value
+ */
+#ifndef UART_UNDEF
+#define UART_UNDEF          (UINT_FAST8_MAX)
+#endif
+
+/**
+ * @brief   Default UART device access macro
+ */
+#ifndef UART_DEV
+#define UART_DEV(x)         (x)
+#endif
+
+/**
+ * @brief   Signature for receive interrupt callback
  *
- * @param[in] arg           optional argument to put the callback in the right context
+ * @param[in] arg           context to the callback (optional)
  * @param[in] data          the byte that was received
  */
-typedef void(*uart_rx_cb_t)(void *arg, char data);
+typedef void(*uart_rx_cb_t)(void *arg, uint8_t data);
 
 /**
- * @brief Signature for the transmit complete interrupt callback
+ * @brief   Signature for receive start condition interrupt callback
  *
- * @param[in] arg           optional argument to put the callback in the right context
- *
- * @return                  1 if more data is to be send
- * @return                  0 if no more data is to be send
+ * @param[in] arg           context to the callback (optional)
  */
-typedef int(*uart_tx_cb_t)(void *arg);
+typedef void(*uart_rxstart_cb_t)(void *arg);
 
 /**
- * @brief Initialize a given UART device
+ * @brief   Interrupt context for a UART device
+ */
+#ifndef HAVE_UART_ISR_CTX_T
+typedef struct {
+    uart_rx_cb_t rx_cb;     /**< data received interrupt callback */
+    void *arg;              /**< argument to data received callback */
+#ifdef MODULE_PERIPH_UART_RXSTART_IRQ
+    uart_rxstart_cb_t rxs_cb;   /**< start condition received interrupt callback */
+    void *rxs_arg;          /**< argument to start condition received callback */
+#endif
+} uart_isr_ctx_t;
+#endif
+
+/**
+ * @brief       Possible UART return values
+ *
+ * @deprecated  Use the errno constants directly instead.
+ */
+enum {
+    UART_OK         =  0,           /**< everything in order */
+    UART_NODEV      = -ENODEV,      /**< invalid UART device given */
+    UART_NOBAUD     = -ENOTSUP,     /**< given symbol rate is not applicable */
+    UART_NOMODE     = -ENOTSUP,     /**< given mode is not applicable */
+    UART_INTERR     = -EIO,         /**< all other internal errors */
+};
+
+/**
+ * @brief   Definition of possible parity modes
+ */
+#ifndef HAVE_UART_PARITY_T
+typedef enum {
+   UART_PARITY_NONE,   /**< no parity */
+   UART_PARITY_EVEN,   /**< even parity */
+   UART_PARITY_ODD,    /**< odd parity */
+   UART_PARITY_MARK,   /**< mark parity */
+   UART_PARITY_SPACE   /**< space parity */
+} uart_parity_t;
+#endif
+
+/**
+ * @brief   Definition of possible data bits lengths in a UART frame
+ */
+#ifndef HAVE_UART_DATA_BITS_T
+typedef enum {
+    UART_DATA_BITS_5,   /**< 5 data bits */
+    UART_DATA_BITS_6,   /**< 6 data bits */
+    UART_DATA_BITS_7,   /**< 7 data bits */
+    UART_DATA_BITS_8,   /**< 8 data bits */
+} uart_data_bits_t;
+#endif
+
+/**
+ * @brief   Definition of possible stop bits lengths in a UART frame
+ */
+#ifndef HAVE_UART_STOP_BITS_T
+typedef enum {
+   UART_STOP_BITS_1,   /**< 1 stop bit */
+   UART_STOP_BITS_2,   /**< 2 stop bits */
+} uart_stop_bits_t;
+#endif
+
+/**
+ * @brief   Initialize and acquire a given UART device
  *
  * The UART device will be initialized with the following configuration:
  * - 8 data bits
  * - no parity
  * - 1 stop bit
- * - baud-rate as given
+ * - symbol rate as given
  *
- * @param[in] uart          the UART device to initialize
- * @param[in] baudrate      the desired baud-rate in baud/s
- * @param[in] rx_cb         receive callback is called for every byte the is receive
- *                          in interrupt context
- * @param[in] tx_cb         transmit callback is called when done with sending a byte
- *                          (TX buffer gets empty)
- * @param[in] arg           optional argument passed to the callback functions
+ * If no callback parameter is given (rx_cb := NULL), the UART will be
+ * initialized in TX only mode.
  *
- * @return                  0 on success
- * @return                  -1 for invalid baud-rate
- * @return                  -2 for all other errors
+ * @pre     The caller is not calling `uart_init()` twice without a call of
+ *          to @ref uart_poweroff in between.
+ *
+ * @note    This may block if the UART is already acquired until it is released.
+ *          This allows sharing the underlying peripheral to provide other
+ *          serial interfaces (e.g. if the peripheral can also provide SPI, I2C,
+ *          etc.)
+ *
+ * @param[in] uart          UART device to initialize
+ * @param[in] baud          desired symbol rate in baud
+ * @param[in] rx_cb         receive callback, executed in interrupt context once
+ *                          for every byte that is received (RX buffer filled),
+ *                          set to NULL for TX only mode
+ * @param[in] arg           optional context passed to the callback functions
+ *
+ * @retval  0               Success
+ * @retval  -ENODEV         Invalid UART device
+ * @retval  -ENOTSUP        Unsupported symbol rate
+ * @retval  <0              On other errors
  */
-int uart_init(uart_t uart, uint32_t baudrate, uart_rx_cb_t rx_cb, uart_tx_cb_t tx_cb, void *arg);
+int uart_init(uart_t uart, uint32_t baud, uart_rx_cb_t rx_cb, void *arg);
+
+#if defined(MODULE_PERIPH_UART_RECONFIGURE) || DOXYGEN
+/**
+ * @brief   Change the pins of the given UART back to plain GPIO functionality
+ *
+ * The pin mux of the RX and TX pins of the bus will be changed back to
+ * default (GPIO) mode and the UART is powered off.
+ * This allows to use the UART pins for another function and return to UART
+ * functionality again by calling @ref uart_init_pins
+ *
+ * If you want the pin to be in a defined state, call @ref gpio_init on it.
+ *
+ * @note Until this is implemented on all platforms, this requires the
+ *       periph_uart_reconfigure feature to be used.
+ *
+ * @param[in] uart      the device to de-initialize
+ */
+void uart_deinit_pins(uart_t uart);
 
 /**
- * @brief Initialize an UART device for (conventional) blocking usage
+ * @brief   Initialize the used UART pins, i.e. RX and TX
  *
- * This function initializes the an UART device for usage without interrupts.
- * When initializing with this function, the corresponding read_blocking and
- * write_blocking functions must be used.
  *
- * The blocking mode should only be used for debugging and testing.
+ * After calling uart_init, the pins must be initialized (i.e. uart_init is
+ * calling this function internally). In normal cases, this function will not
+ * be used. But there are some devices, that use UART bus lines also for other
+ * purposes and need the option to dynamically re-configure one or more of the
+ * used pins. So they can take control over certain pins and return control back
+ * to the UART driver using this function.
  *
- * Same as uart_init(), the UART device is configured with in 8N1 mode with the given baud-rate.
+ * The pins used are configured in the board's periph_conf.h.
  *
- * @param[in] uart          the UART device to initialize
- * @param[in] baudrate      the desired baud-rate in baud/s
- *
-* @return                   0 on success, -1 for invalid baud-rate, -2 for all other errors
+ * @param[in] uart      UART device the pins are configure for
  */
-int uart_init_blocking(uart_t uart, uint32_t baudrate);
+void uart_init_pins(uart_t uart);
+
+#if DOXYGEN
+/**
+ * @brief   Get the RX pin of the given UART.
+ *
+ * @param[in] uart      The device to query
+ *
+ * @note Until this is implemented on all platforms, this requires the
+ *       periph_uart_reconfigure feature to be used.
+ *
+ * @return              The GPIO used for the UART RX line.
+ */
+gpio_t uart_pin_rx(uart_t uart);
 
 /**
- * @brief Begin a new transmission, on most platforms this function will enable the TX interrupt
+ * @brief   Get the TX pin of the given UART.
  *
- * @param[in] uart          UART device that will start a transmission
+ * @param[in] uart      The device to query
+ *
+ * @note Until this is implemented on all platforms, this requires the
+ *       periph_uart_reconfigure feature to be used.
+ *
+ * @return              The GPIO used for the UART TX line.
  */
-void uart_tx_begin(uart_t uart);
+gpio_t uart_pin_tx(uart_t uart);
+
+#endif /* DOXYGEN */
 
 /**
- * @brief Write a byte into the UART's send register
+ * @brief   Get the CTS pin of the given UART.
  *
- * Writing a byte into while another byte is still waiting to be transferred will override
- * the old byte. This method should be used in the transmit callback routine as in this it
- * is made sure that no old byte is waiting to be transferred.
+ * @param[in] uart      The device to query
  *
- * @param[in] uart          the UART device to use for transmission
- * @param[in] data          the byte to write
+ * @note Until this is implemented on all platforms, this requires the
+ *       periph_uart_reconfigure feature to be used.
  *
- * @return                  1 on success, -1 on error
+ * @return              The GPIO used for the UART CTS line.
  */
-int uart_write(uart_t uart, char data);
+gpio_t uart_pin_cts(uart_t uart);
 
 /**
- * @brief Read a single character from the given UART device in blocking manner.
+ * @brief   Get the RTS pin of the given UART.
  *
- * This function will actively wait until a byte is available in the UART receive
- * register. Consider using the interrupt driven UART mode instead!
+ * @param[in] uart      The device to query
  *
- * @param[in] uart          the UART device to read from
- * @param[in] data          the byte to write
+ * @note Until this is implemented on all platforms, this requires the
+ *       periph_uart_reconfigure feature to be used.
  *
- * @return                  1 on success, -1 on error
+ * @return              The GPIO used for the UART RTS line.
  */
-int uart_read_blocking(uart_t uart, char *data);
+gpio_t uart_pin_rts(uart_t uart);
+
+#endif /* MODULE_PERIPH_UART_RECONFIGURE */
+
+#if defined(MODULE_PERIPH_UART_RXSTART_IRQ) || DOXYGEN
 
 /**
- * @brief Write a single byte to the given UART device in blocking manner.
+ * @brief   Configure the function that will be called when a start condition
+ *          is detected.
  *
- * Note: in contrast uart_write, this function will actively wait (block) until the UART
- * device is ready to send a new byte. Consider using the interrupt driven UART mode instead.
+ *          This will not enable / disable the generation of the RX start
+ *          interrupt.
  *
- * @param[in] uart          the UART device to write to
- * @param[in] data          the byte to send
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
  *
- * @return                  1 on success, -1 on error
+ * @param[in] uart      The device to configure
+ * @param[in] cb        The function called when a start condition is detected
+ * @param[in] arg       Optional function argument
  */
-int uart_write_blocking(uart_t uart, char data);
+void uart_rxstart_irq_configure(uart_t uart, uart_rxstart_cb_t cb, void *arg);
 
 /**
- * @brief Power on the given UART device
+ * @brief   Enable the RX start interrupt.
+ *
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
+ *
+ * @param[in] uart      The device to configure
+ */
+void uart_rxstart_irq_enable(uart_t uart);
+
+/**
+ * @brief   Disable the RX start interrupt.
+ *
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
+ *
+ * @param[in] uart      The device to configure
+ */
+void uart_rxstart_irq_disable(uart_t uart);
+#endif /* MODULE_PERIPH_UART_RXSTART_IRQ */
+
+#if defined(MODULE_PERIPH_UART_COLLISION) || DOXYGEN
+/**
+ * @brief   Enables collision detection check of the UART.
+ *          This assumes the UART is connected to a bus where RX and TX are
+ *          connected. After each sent byte it is checked whether the same
+ *          byte could be received.
+ *
+ *          This disables the RX interrupt.
+ *
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
+ *
+ * @param[in] uart      The device to configure
+ */
+void uart_collision_detect_enable(uart_t uart);
+/**
+ * @brief   Disables collision detection check of the UART.
+ *
+ *          If an RX interrupt was configured before, it is enabled again.
+ *
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
+ *
+ * @param[in] uart      The device to configure
+ */
+void uart_collision_detect_disable(uart_t uart);
+
+/**
+ * @brief   Disables collision detection check of the UART.
+ *
+ *          If an RX interrupt was configured before, it is enabled again.
+ *
+ * @note    You have to add the module `periph_uart_rxstart_irq` to your project
+ *          to enable this function
+ *
+ * @param[in] uart      The device to probe
+ *
+ * @return              true if a collision occurred during the last transder
+ */
+bool uart_collision_detected(uart_t uart);
+#endif /* MODULE_PERIPH_UART_COLLISION */
+
+/**
+ * @brief   Setup parity, data and stop bits for a given UART device
+ *
+ * @param[in] uart          UART device to configure
+ * @param[in] data_bits     number of data bits in a UART frame
+ * @param[in] parity        parity mode
+ * @param[in] stop_bits     number of stop bits in a UART frame
+ *
+ * @retval  0               Success
+ * @retval  -ENOTSUP        Given configuration not supported
+ * @retval  <0              Other error
+ */
+int uart_mode(uart_t uart, uart_data_bits_t data_bits, uart_parity_t parity,
+              uart_stop_bits_t stop_bits);
+
+/**
+ * @brief   Write data from the given buffer to the specified UART device
+ *
+ * This function is blocking, as it will only return after @p len bytes from the
+ * given buffer have been send. The way this data is send is up to the
+ * implementation: active waiting, interrupt driven, DMA, etc.
+ *
+ * @param[in] uart          UART device to use for transmission
+ * @param[in] data          data buffer to send
+ * @param[in] len           number of bytes to send
+ *
+ */
+void uart_write(uart_t uart, const uint8_t *data, size_t len);
+
+/**
+ * @brief   Power on and acquire the given UART device
+ *
+ * The UART will resume with the configuration it was most recently configured
+ * with.
  *
  * @param[in] uart          the UART device to power on
  */
 void uart_poweron(uart_t uart);
 
 /**
- * @brief Power off the given UART device
+ * @brief Power off and release the given UART device
  *
  * @param[in] uart          the UART device to power off
  */
 void uart_poweroff(uart_t uart);
 
-#endif /* UART_NUMOF */
+/**
+ * @brief Enable the TX line one the given UART
+ *
+ * @note requires the `periph_uart_tx_ondemand` feature
+ *
+ * @param[in] uart          the UART device start TX on
+ */
+void uart_enable_tx(uart_t uart);
+
+/**
+ * @brief Disable the TX line one the given UART
+ *
+ * @note requires the `periph_uart_tx_ondemand` feature
+ *
+ * @param[in] uart          the UART device to stop TX on
+ */
+void uart_disable_tx(uart_t uart);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* PERIPH_UART_H */
 /** @} */

@@ -1,19 +1,6 @@
 /*
- * Copyright (C) 2014  René Kijewski  <rene.kijewski@fu-berlin.de>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
 
 /**
@@ -34,8 +21,8 @@ typedef unsigned (*ringbuffer_op_t)(ringbuffer_t *restrict rb, char *buf, unsign
 static ssize_t pipe_rw(ringbuffer_t *rb,
                        void *buf,
                        size_t n,
-                       tcb_t **other_op_blocked,
-                       tcb_t **this_op_blocked,
+                       thread_t **other_op_blocked,
+                       thread_t **this_op_blocked,
                        ringbuffer_op_t ringbuffer_op)
 {
     if (n == 0) {
@@ -43,12 +30,12 @@ static ssize_t pipe_rw(ringbuffer_t *rb,
     }
 
     while (1) {
-        unsigned old_state = disableIRQ();
+        unsigned old_state = irq_disable();
 
         unsigned count = ringbuffer_op(rb, buf, n);
 
         if (count > 0) {
-            tcb_t *other_thread = *other_op_blocked;
+            thread_t *other_thread = *other_op_blocked;
             int other_prio = -1;
             if (other_thread) {
                 *other_op_blocked = NULL;
@@ -56,7 +43,7 @@ static ssize_t pipe_rw(ringbuffer_t *rb,
                 sched_set_status(other_thread, STATUS_PENDING);
             }
 
-            restoreIRQ(old_state);
+            irq_restore(old_state);
 
             if (other_prio >= 0) {
                 sched_switch(other_prio);
@@ -64,15 +51,15 @@ static ssize_t pipe_rw(ringbuffer_t *rb,
 
             return count;
         }
-        else if (*this_op_blocked || inISR()) {
-            restoreIRQ(old_state);
+        else if (*this_op_blocked || irq_is_in()) {
+            irq_restore(old_state);
             return 0;
         }
         else {
-            *this_op_blocked = (tcb_t *) sched_active_thread;
+            *this_op_blocked = thread_get_active();
 
-            sched_set_status((tcb_t *) sched_active_thread, STATUS_SLEEPING);
-            restoreIRQ(old_state);
+            sched_set_status(thread_get_active(), STATUS_SLEEPING);
+            irq_restore(old_state);
             thread_yield_higher();
         }
     }

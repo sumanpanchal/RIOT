@@ -1,6 +1,6 @@
 # Unittests
 
-## Building and running tests
+## Building and Running Tests
 Tests can be built by calling:
 
 ```bash
@@ -22,16 +22,25 @@ You then can run the tests by calling
 make term
 ```
 
-or flash them to your board as you would flash any RIOT application to the board (see [[board documentation|RIOT-Platforms]]).
+or flash them to your board as you would [flash any RIOT application](https://guide.riot-os.org/getting-started/flashing/) to the board.
 
-### Other output formats
+You can debug your tests by running
+
+```bash
+make debug
+```
+and using GDB as usual.
+
+### Other Output Formats
 Other output formats using [*embUnit*](http://embunit.sourceforge.net/)'s ``textui`` library are available by setting the environment variable ``OUTPUT``:
 
 * Compiler: ``OUTPUT="COMPILER"``
 * Text: ``OUTPUT="TEXT"``
 * XML: ``OUTPUT="XML"``
+* Color: ``OUTPUT="COLOR"`` (like default, but with red/green output)
+* Colored-Text: ``OUTPUT="COLORTEXT"`` (like ``TEXT``, but with red/green output)
 
-#### Compile example
+#### Compile Example
 ```bash
 OUTPUT="COMPILER" make tests-core
 make term
@@ -39,7 +48,7 @@ make term
 
 (only outputs in case of test failures)
 
-#### Text example
+#### Text Example
 ```bash
 OUTPUT="TEXT" make tests-core
 make term
@@ -57,13 +66,13 @@ make term
 OK (... tests)
 ```
 
-#### XML example
+#### XML Example
 ```bash
 OUTPUT="XML" make tests-core
 make term
 ```
 
-```XML
+```xml
 <?xml version="1.0" encoding='shift_jis' standalone='yes' ?>
 <TestRun>
 <core_bitarithm_tests>
@@ -87,17 +96,18 @@ make term
 </TestRun>
 ```
 
-## Writing unit tests
-### File struture
+## Writing Unittests
+
+### File Structure
 RIOT uses [*embUnit*](http://embunit.sourceforge.net/) for unit testing.
-All unit tests are organized in ``tests/unittests`` and can be build module-wise, if needed.
+All unittests are organized in ``tests/unittests`` and can be built module-wise, if needed.
 For each module there exists a ``tests-<modulename>/tests-<modulename>.h`` file, at least one C file in ``tests-<modulename>/`` and a ``tests-<modulename>/Makefile``.
 It is recommended to add a C file named ``tests-<modulename>/tests-<modulename>-<headername>.c`` for every header file that defines functions (or macros) implemented in the module.
 If there is only one such header file ``tests-<modulename>/tests-<modulename>.c`` should suffice.
 
 Each ``*.c`` file should implement a function defined in ``tests-<modulename>/tests-<modulename>.h``, named like
 
-```C
+```c
 Test *tests_<modulename>_<headername>_tests(void);
 
 /* or respectively */
@@ -105,7 +115,7 @@ Test *tests_<modulename>_<headername>_tests(void);
 Test *tests_<modulename>_tests(void);
 ```
 
-### Testing a module
+### Testing a Module
 To write new tests for a module you need to do three things:
 
 1. **[Create a Makefile](#create-a-makefile)**: add a file ``tests-<modulename>/Makefile``
@@ -115,21 +125,20 @@ To write new tests for a module you need to do three things:
 #### Create a Makefile
 The Makefile should have the following content:
 
-```Makefile
+```makefile
 include $(RIOTBASE)/Makefile.base
 ```
 
-#### Define a test header.
+#### Define a Test Header.
 The test header ``tests-<modulename>/tests-<module>.h`` of a module you add to ``tests/unittests/`` should have the following structure
 
-```C
+```c
 /*
- * Copyright (C) <year> <author>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: <year> <author>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @addtogroup  unittests
@@ -140,8 +149,7 @@ The test header ``tests-<modulename>/tests-<module>.h`` of a module you add to `
  *
  * @author      <author>
  */
-#ifndef TESTS_<MODULE>_H_
-#define TESTS_<MODULE>_H_
+
 #include "embUnit/embUnit.h"
 
 #ifdef __cplusplus
@@ -168,25 +176,21 @@ Test *tests_<module>_<header2>_tests(void);
 }
 #endif
 
-#endif /* TESTS_<MODULE>_H_ */
 /** @} */
 ```
 
-#### Implement tests
+#### Implement Tests
 Every ``tests-<modulename>/tests-<module>*.c`` file you add to ``tests/unittests/`` should have the following structure:
 
-```C
+```c
 /*
- * Copyright (C) <year> <author>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: <year> <author>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /* clib includes */
 
-#include "embUnit/embUnit.h"
+#include "embUnit.h"
 
 #include "<header>.h"
 
@@ -244,12 +248,10 @@ Test *tests_<module>_<header>_tests(void)
         /* ... */
     };
 
-    EMB_UNIT_TESTCALLER(<module>_<header>_tests, "<module>_<header>_tests",
-                        tests_<module>_<header>_set_up,
-                        tests_<module>_<header>_tear_down, fixtures);
+    EMB_UNIT_TESTCALLER(<module>_<header>_tests, set_up, tear_down, fixtures);
     /* set up and tear down function can be NULL if omitted */
 
-    return (Test *)&<module>_<header>;
+    return (Test *)&<module>_<header>_tests;
 }
 ```
 
@@ -321,3 +323,14 @@ The following assertion macros are available via *embUnit*
     </tr>
   </tbody>
 </table>
+
+## Out of Tree Unittests
+
+Export the environment variable `EXTERNAL_UNITTEST_DIRS` that contains a space
+separated list of out-of-tree unittests to also include in the test. The tests
+will be treated the exact same way as tests in this folder and must follow the
+same naming convention (each folder in `EXTERNAL_UNITTEST_DIRS` should have
+`tests-<name>` folders containing the unittests).
+
+This feature works best with `EXTERNAL_MODULE_DIRS` that contain the code the
+external unittests should cover.

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2020 Mesotic SAS
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "USBUS DFU"
+    depends on USEMODULE_USBUS_DFU
+
+config USB_DFU_DETACH_TIMEOUT_MS
+    int
+    range 0 65535
+    prompt "DFU detach timeout (ms)"
+    default 255
+    help
+        Indicates the detach timeout USB device should advertise to
+        the host USB. Host USB should abort the pending operation if
+        device doesnt detach after this timeout.
+
+config CUSTOM_RIOTBOOT_MAGIC_ADDR
+    bool "Use custom DFU magic address"
+    help
+        Say n to use the default address, which is the last in RAM.
+
+config RIOTBOOT_MAGIC_ADDR
+    int "DFU magic address"
+    depends on CUSTOM_RIOTBOOT_MAGIC_ADDR
+
+endmenu # USBUS DFU

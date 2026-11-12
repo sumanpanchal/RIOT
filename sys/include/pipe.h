@@ -1,20 +1,9 @@
 /*
- * Copyright (C) 2014  René Kijewski  <rene.kijewski@fu-berlin.de>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-or-later
  */
+
+#pragma once
 
 /**
  * @defgroup    sys_pipe Pipe IPC
@@ -31,9 +20,6 @@
  *
  * @author      René Kijewski <rene.kijewski@fu-berlin.de>
  */
-
-#ifndef __PIPE__H
-#define __PIPE__H
 
 #include <sys/types.h>
 
@@ -52,13 +38,15 @@ extern "C" {
 /**
  * A generic pipe.
  */
-typedef struct riot_pipe
-{
-    ringbuffer_t *rb;     /**< Wrapped ringbuffer. */
-    tcb_t *read_blocked;  /**< A thread that wants to write to this full pipe. */
-    tcb_t *write_blocked; /**< A thread that wants to read from this empty pipe. */
-    void (*free)(void *); /**< Function to call by pipe_free(). Used like `pipe->free(pipe)`. */
-} pipe_t;
+typedef struct riot_pipe {
+    ringbuffer_t *rb;               /**< Wrapped ringbuffer. */
+    thread_t *read_blocked;         /**< A thread that wants to write to this
+                                         full pipe. */
+    thread_t *write_blocked;        /**< A thread that wants to read from this
+                                         empty pipe. */
+    void (*free)(void *);           /**< Function to call by pipe_free(). Used like
+                                         `pipe->free(pipe)`. */
+    } pipe_t;
 
 /**
  * @brief        Initialize a pipe.
@@ -74,7 +62,7 @@ void pipe_init(pipe_t *pipe, ringbuffer_t *rb, void (*free)(void *));
  * @details      Only one thread may access the pipe readingly at once.
  *               If the pipe is empty, then the current thread is send sleeping.
  *               It gets woken up once there is data ready in the pipe.
- *               In an ISR (inISR()) 0 will returned if the pipe is empty.
+ *               In an ISR (irq_is_in()) 0 will returned if the pipe is empty.
  * @param[in]    pipe   Pipe to read from.
  * @param[out]   buf    Buffer to write into
  * @param        n      Size of buffer.
@@ -88,7 +76,7 @@ ssize_t pipe_read(pipe_t *pipe, void *buf, size_t n);
  * @details      Only one thread may access the pipe writingly at once.
  *               If the pipe is full, then the current thread is send sleeping.
  *               It gets woken up once there is room again in the pipe.
- *               In an ISR (inISR()) 0 will returned if the pipe is full.
+ *               In an ISR (irq_is_in()) 0 will returned if the pipe is full.
  * @param[in]    pipe   Pipe to write to.
  * @param[out]   buf    Buffer to read from.
  * @param        n      Size of buffer.
@@ -119,7 +107,6 @@ void pipe_free(pipe_t *rp);
 }
 #endif
 
-#endif
 /**
  * @}
  */

@@ -1,9 +1,6 @@
 /*
- * Copyright (C) 2013 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2013 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /**
@@ -157,4 +154,24 @@ int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
     attr->ss_size = stacksize;
     return 0;
+}
+
+int pthread_attr_getstack(pthread_attr_t *attr, void **stackaddr, size_t *stacksize)
+{
+    int res = pthread_attr_getstackaddr(attr, stackaddr);
+    if (res != 0) {
+        return res;
+    }
+
+    return pthread_attr_getstacksize(attr, stacksize);
+}
+
+int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize)
+{
+    int res = pthread_attr_setstackaddr(attr, stackaddr);
+    if (res != 0) {
+        return res;
+    }
+
+    return pthread_attr_setstacksize(attr, stacksize);
 }

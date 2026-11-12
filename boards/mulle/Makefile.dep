@@ -1,9 +1,21 @@
-ifneq (,$(filter defaulttransceiver,$(USEMODULE)))
-    USEMODULE += at86rf231
-    ifeq (,$(filter netdev_base,$(USEMODULE)))
-        USEMODULE += transceiver
-    endif
+ifneq (,$(filter netdev_default,$(USEMODULE)))
+  USEMODULE += at86rf212b
 endif
+
+ifneq (,$(filter saul_default,$(USEMODULE)))
+  USEMODULE += lis3dh
+endif
+
 # The Mulle uses NVRAM to store persistent variables, such as boot count.
-#~ USEMODULE += nvram_spi
-# Uncomment above when #2353 is merged.
+USEMODULE += nvram_spi
+USEMODULE += nvram
+USEMODULE += devfs
+USEMODULE += mtd_spi_nor
+
+# mulle always uses the rtt for the oscillator
+USEMODULE += periph_rtt
+
+ifneq (,$(filter saul_default,$(USEMODULE)))
+  USEMODULE += saul_gpio
+  USEMODULE += saul_adc
+endif

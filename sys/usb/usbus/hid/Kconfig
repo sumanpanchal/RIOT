@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2021 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+config USBUS_HID_INTERRUPT_EP_SIZE
+    int "Interrupt endpoint size in bytes"
+    default 64
+    depends on USEMODULE_USBUS_HID

@@ -1,0 +1,31 @@
+/*
+ * SPDX-FileCopyrightText: 2020 Mesotic SAS
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+/**
+ * @ingroup     sys_auto_init_gnrc_netif
+ * @{
+ *
+ * @brief       Auto initialize sam0 ethernet driver
+ *
+ * @author      Dylan Laduranty <dylan.laduranty@mesotic.com>
+ */
+
+#include "net/gnrc/netif/ethernet.h"
+#include "sam0_eth_netdev.h"
+#include "include/init_devs.h"
+
+static netdev_t sam0eth;
+static char stack[GNRC_NETIF_STACKSIZE_DEFAULT];
+static gnrc_netif_t _netif;
+
+void auto_init_sam0_eth(void)
+{
+    /* setup netdev device */
+    sam0_eth_setup(&sam0eth);
+    /* initialize netdev <-> gnrc adapter state */
+    gnrc_netif_ethernet_create(&_netif, stack, GNRC_NETIF_STACKSIZE_DEFAULT,
+                               GNRC_NETIF_PRIO, "sam0_eth", &sam0eth);
+}
+/** @} */

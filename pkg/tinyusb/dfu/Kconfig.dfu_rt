@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2022 Gunar Schorcht
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_TINYUSB_CLASS_DFU_RUNTIME
+
+config TUSBD_DFU_RT_NUMOF
+    int
+    default 1
+
+config TUSBD_DFU_RT_FS_XFER_SIZE
+    int "DFU Full-Speed transfer size [byte]"
+    default 64
+
+config TUSBD_DFU_RT_HS_XFER_SIZE
+    int "DFU High-Speed transfer size [byte]"
+    default 512
+
+config TUSBD_DFU_RT_DETACH_TIMEOUT
+    int "DFU detach timeout [ms]"
+    default 1000
+
+endif # USEMODULE_TINYUSB_CLASS_DFU_RUNTIME

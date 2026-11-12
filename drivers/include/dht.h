@@ -1,16 +1,20 @@
 /*
- * Copyright 2015 Ludwig Ortmann, Christian Mehlis
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2015 Ludwig Knüpfer
+ * SPDX-FileCopyrightText: 2015 Christian Mehlis
+ * SPDX-FileCopyrightText: 2016-2017 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    driver_dht DHT Family of Humidity and Temperature Sensors
- * @ingroup     drivers
+ * @defgroup    drivers_dht DHT Family of Humidity and Temperature Sensors
+ * @ingroup     drivers_sensors
+ * @ingroup     drivers_saul
  * @brief       Device driver for the DHT Family of humidity
  *              and temperature sensors
+ *
+ * This driver provides @ref drivers_saul capabilities.
  *
  * @{
  *
@@ -18,13 +22,12 @@
  * @brief       Device driver interface for the DHT family of humidity
  *              and temperature sensors
  *
- * @author      Ludwig Ortmann <ludwig.ortmann@fu-berlin.de
+ * @author      Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de
  * @author      Christian Mehlis <mehlis@inf.fu-berlin.de>
+ * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef DHT_H
-#define DHT_H
-
+#include <errno.h>
 #include <stdint.h>
 
 #include "periph/gpio.h"
@@ -34,81 +37,86 @@ extern "C" {
 #endif
 
 /**
- * @brief data type for storing DHT sensor readings
+ * @brief   Data type for storing DHT sensor readings
  */
 typedef struct {
-    uint16_t humidity;      /**< relative deca-humidity */
-    uint16_t temperature;   /**< temperature in deca-Celsius */
+    uint16_t humidity;      /**< relative humidity in deci-percent */
+    uint16_t temperature;   /**< temperature in deci-Celsius */
 } dht_data_t;
 
 /**
- * @brief device type of the DHT device
+ * @brief   Device type of the DHT device
  */
 typedef enum {
-    DHT11,                  /**< DHT11 device identifier */
+    DHT11,                  /**< Older DHT11 variants with either 1 °C or
+                              *  0.1 °C resolution */
+    DHT11_2022,             /**< New DHT11 variant with 0.01 °C resolution */
     DHT22,                  /**< DHT22 device identifier */
-    DHT21 = DHT22           /**< DHT21 device identifier */
+    DHT21 = DHT22,          /**< DHT21 device identifier */
+    AM2301 = DHT22,         /**< AM2301 device identifier */
 } dht_type_t;
 
 /**
- * @brief device descriptor for DHT sensor devices
+ * @brief   Configuration parameters for DHT devices
  */
 typedef struct {
-    gpio_t gpio;            /**< GPIO pin of the device's data pin */
+    gpio_t pin;             /**< GPIO pin of the device's data pin */
     dht_type_t type;        /**< type of the DHT device */
+    gpio_mode_t in_mode;    /**< input pin configuration, with or without pull
+                             *   resistor */
+} dht_params_t;
+
+/**
+ * @brief   Device descriptor for DHT sensor devices
+ */
+typedef struct {
+    dht_params_t params;    /**< Device parameters */
+    dht_data_t last_val;    /**< Values of the last measurement */
 } dht_t;
 
 /**
- * @brief initialize a new DHT device
+ * @brief   Initialize a new DHT device
  *
- * @param[in] dev       device descriptor of a DHT device
- * @param[in] type      type of the DHT device
- * @param[in] gpio      GPIO pin the device's data pin is connected to
+ * @param[out] dev      device descriptor of a DHT device
+ * @param[in]  params   configuration parameters
  *
- * @return              0 on success
- * @return              -1 on error
+ * @retval  0           Success
+ * @retval -EXDEV       A low level on the input after the sensor's startup
+ *                      time indicates that either no sensor or pull-up
+ *                      resistor is connected, or the sensor is physically
+ *                      poorly connected or powered.
+ * @retval -ENODEV      The sensor did not respond to the transmission of a
+ *                      start signal. Likely there were a pull-up resistor but
+ *                      no sensor connected on the data line.
  */
-int dht_init(dht_t *dev, dht_type_t type, gpio_t gpio);
-
- /**
- * @brief   read sensor data from device
- *
- * @param[in]  dev      device descriptor of a DHT device
- * @param[out] relhum   pointer to relative humidity in g/m^3
- * @param[out] temp     pointer to temperature in degrees Celsius
- *
- * @return              0 on success
- * @return              -1 on error
- */
-int dht_read(dht_t *dev, float *relhum, float *temp);
-
- /**
- * @brief   read sensor data from device
- *
- * @note    When reading fails and the function indicates an error,
- *          data will contain garbage.
- *
- * @param[in] dev       device descriptor of a DHT device
- * @param[in] data      pointer to DHT data object
- *
- * @return              0 on success
- * @return              -1 on checksum error
- */
-int dht_read_raw(dht_t *dev, dht_data_t *data);
+int dht_init(dht_t *dev, const dht_params_t *params);
 
 /**
- * @brief   parse raw sensor data into relative humidity and Celsius
+ * @brief   get a new temperature and/or humidity value from the device
  *
- * @param[in]   dev     device descriptor of a DHT device
- * @param[in]   data    sensor data
- * @param[out]  relhum  pointer to relative humidity in g/m^3
- * @param[out]  temp    pointer to temperature in degrees Celsius
+ * @note    if reading fails or checksum is invalid, no new values will be
+ *          written into the result values
+ *
+ * @param[in]  dev      device descriptor of a DHT device
+ * @param[out] temp     temperature value [in °C * 10^-1],
+ *                      may be NULL if not needed
+ * @param[out] hum      relative humidity value [in percent * 10^-1],
+ *                      may be NULL if not needed
+ *
+ * @retval 0            Success
+ * @retval -ENODEV      The sensor did not respond to the transmission of a
+ *                      start signal. Likely the RESPAWN_TIMEOUT is
+ *                      insufficient.
+ * @retval -EIO         The received and the expected checksum didn't match.
+ * @retval -ENOSYS      Unable to parse the received data. Likely the data
+ *                      format is not implemented.
+ * @retval -ERANGE      Temperature low byte >= 10. Likely misconfigured
+ *                      device type (DHT11_2022).
  */
-void dht_parse(dht_t *dev, dht_data_t *data, float *relhum, float *temp);
+int dht_read(dht_t *dev, int16_t *temp, int16_t *hum);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* DHT_H */
 /** @} */

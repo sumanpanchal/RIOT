@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2020 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+config BOARD
+    default "particle-argon" if BOARD_PARTICLE_ARGON
+
+config BOARD_PARTICLE_ARGON
+    bool
+    default y
+    select BOARD_COMMON_PARTICLE_MESH
+
+source "$(RIOTBOARD)/common/particle-mesh/Kconfig"

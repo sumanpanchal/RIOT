@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -13,9 +12,6 @@
  * @brief   Implementation of a fair, POSIX conforming reader/writer lock (attribute set).
  * @note    Do not include this header file directly, but pthread.h.
  */
-
-#ifndef __SYS__POSIX__PTHREAD_RWLOCK_ATTR__H
-#define __SYS__POSIX__PTHREAD_RWLOCK_ATTR__H
 
 #include <errno.h>
 
@@ -27,7 +23,7 @@ extern "C" {
  * @brief     Attributes for a new reader/writer lock.
  * @details   The options set in this struct will be ignored by pthread_rwlock_init().
  */
-typedef struct pthread_rwlockattr
+typedef struct
 {
     /**
      * @brief     Whether to share lock with child processes.
@@ -38,7 +34,7 @@ typedef struct pthread_rwlockattr
 } pthread_rwlockattr_t;
 
 /**
- * @brief           Initilize the attribute set with the defaults.
+ * @brief           Initialize the attribute set with the defaults.
  * @details         Default value for pshared: `PTHREAD_PROCESS_PRIVATE`.
  *                  A zeroed out datum is initialized.
  * @param[in,out]   attr   Attribute set to initialize.
@@ -78,8 +74,6 @@ int pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

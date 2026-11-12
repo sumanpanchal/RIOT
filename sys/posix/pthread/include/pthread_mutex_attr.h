@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -13,9 +12,6 @@
  * @brief   Attributes for pthread mutexes.
  * @note    Do not include this header file directly, but pthread.h.
  */
-
-#ifndef __SYS__POSIX__PTHREAD_MUTEX_ATTR__H
-#define __SYS__POSIX__PTHREAD_MUTEX_ATTR__H
 
 #include <errno.h>
 
@@ -85,7 +81,7 @@ extern "C" {
 /**
  * @brief           This type is unused right now, and only exists for POSIX compatibility.
  */
-typedef struct pthread_mutexattr
+typedef struct
 {
     int pshared;    /**< Whether to share the mutex with child processes. */
     int kind;       /**< Type of the mutex. */
@@ -213,8 +209,6 @@ int pthread_mutexattr_setrobust(pthread_mutexattr_t *attr, int robustness);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

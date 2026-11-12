@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /*
  * bloom.c
@@ -72,7 +71,7 @@
  *
  * This is not strictly correct as it assumes independence for the
  * probabilities of each bit being set. However, assuming it is a close
- * approximation we have that the probability of false positives descreases
+ * approximation we have that the probability of false positives decreases
  * as m (the number of bits in the array) increases, and increases as n
  * (the number of inserted elements) increases. For a given m and n, the
  * value of k (the number of hash functions) that minimizes the probability
@@ -120,9 +119,6 @@
  * @author Christian Mehlis <mehlis@inf.fu-berlin.de>
  */
 
-#ifndef _BLOOM_FILTER_H
-#define _BLOOM_FILTER_H
-
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -134,7 +130,7 @@ extern "C" {
 /**
  * @brief hash function to use in thee filter
  */
-typedef uint32_t (*hashfp_t)(const uint8_t *, int len);
+typedef uint32_t (*hashfp_t)(const uint8_t *, size_t len);
 
 /**
  * @brief bloom_t bloom filter object
@@ -151,25 +147,24 @@ typedef struct {
 } bloom_t;
 
 /**
- * @brief Allocate and return a pointer to a new Bloom filter.
+ * @brief Initialize a Bloom Filter.
  *
- * For best results, make 'size' a power of 2.
+ * @note For best results, make 'size' a power of 2.
  *
- * @param size        size of the bit array of the filter in bits
- * @param num_hashes  the number of hash functions
- * @param ...         varg function pointers, use hashfp_t
+ * @param bloom             bloom_t to initialize
+ * @param size              size of the bloom filter in bits
+ * @param bitfield          underlying bitfield of the bloom filter
+ * @param hashes            array of hashes
+ * @param hashes_numof      number of elements in hashes
  *
- * @return An allocated bloom filter
- *
+ * @pre     @p bitfield MUST be large enough to hold @p size bits.
  */
-bloom_t *bloom_new(size_t size, size_t num_hashes, ...);
+void bloom_init(bloom_t *bloom, size_t size, uint8_t *bitfield, hashfp_t *hashes, int hashes_numof);
 
 /**
  * @brief Delete a Bloom filter.
  *
  * @param bloom The condemned
- * @return nothing
- *
  */
 void bloom_del(bloom_t *bloom);
 
@@ -182,8 +177,6 @@ void bloom_del(bloom_t *bloom);
  * @param bloom  Bloom filter
  * @param buf    string to add
  * @param len    the length of the string @p buf
- * @return       nothing
- *
  */
 void bloom_add(bloom_t *bloom, const uint8_t *buf, size_t len);
 
@@ -200,7 +193,7 @@ void bloom_add(bloom_t *bloom, const uint8_t *buf, size_t len);
  * it may also be that another string just happened to produce a hash value
  * that would also set this bit. That would be a false positive. This is why
  * we have k > 1, so we can minimize the likelihood of false positives
- * occuring.
+ * occurring.
  *
  * If every bit corresponding to every one of the k hashes of our query
  * string is set, we can say with some probability of being correct that
@@ -232,4 +225,3 @@ bool bloom_check(bloom_t *bloom, const uint8_t *buf, size_t len);
 #endif
 
 /** @} */
-#endif /* _BLOOM_FILTER_H */

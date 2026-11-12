@@ -1,91 +1,163 @@
-                          ZZZZZZ
-                        ZZZZZZZZZZZZ
-                      ZZZZZZZZZZZZZZZZ
-                     ZZZZZZZ     ZZZZZZ
-                    ZZZZZZ        ZZZZZ
-                    ZZZZZ          ZZZZ
-                    ZZZZ           ZZZZZ
-                    ZZZZ           ZZZZ
-                    ZZZZ          ZZZZZ
-                    ZZZZ        ZZZZZZ
-                    ZZZZ     ZZZZZZZZ       777        7777       7777777777
-              ZZ    ZZZZ   ZZZZZZZZ         777      77777777    77777777777
-          ZZZZZZZ   ZZZZ  ZZZZZZZ           777     7777  7777       777
-        ZZZZZZZZZ   ZZZZ    Z               777     777    777       777
-       ZZZZZZ       ZZZZ                    777     777    777       777
-      ZZZZZ         ZZZZ                    777     777    777       777
-     ZZZZZ          ZZZZZ    ZZZZ           777     777    777       777
-     ZZZZ           ZZZZZ    ZZZZZ          777     777    777       777
-     ZZZZ           ZZZZZ     ZZZZZ         777     777    777       777
-     ZZZZ           ZZZZ       ZZZZZ        777     777    777       777
-     ZZZZZ         ZZZZZ        ZZZZZ       777     777    777       777
-      ZZZZZZ     ZZZZZZ          ZZZZZ      777     7777777777       777
-       ZZZZZZZZZZZZZZZ            ZZZZ      777      77777777        777
-         ZZZZZZZZZZZ               Z
-            ZZZZZ
+[![Nightly CI status master][ci-badge]][ci-link]
+[![GitHub release][release-badge]][release-link]
+[![License][license-badge]][license-link]
+[![API docs][api-badge]][api-link]
+[![Getting Started Guide][guide-badge]][guide-link]
+[![Mastodon][mastodon-badge]][mastodon-link]
+[![Matrix][matrix-badge]][matrix-link]
 
-The friendly Operating System for IoT!
+![RIOT Logo](doc/resources/riot-logo.svg)
 
-## FEATURES
-RIOT OS is an operating system for Internet of Things (IoT) devices. It is based on a microkernel and designed for
-* energy efficiency
-* hardware independent development
-* a high degree of modularity
+# RIOT OS: The friendly Operating System for IoT
 
-Its features comprise
-* a preemptive, tickless scheduler with priorities
-* flexible memory management
-* high resolution timers
-* virtual, long-term timers
-* the native port allows to run RIOT as-is on Linux, BSD, and MacOS. Multiple instances of RIOT running on a single machine can also be interconnected via a simple virtual Ethernet bridge
-* Wiselib support (C++ algorithm library, including routing, clustering, timesync, localization, security and more algorithms)
-* IPv6
-* TCP and UDP
-* 6LoWPAN
-* AODVv2, NHDP, RPL
+RIOT is an **open-source microcontroller operating system**, designed to match
+the requirements of Internet of Things (IoT) devices and other embedded devices.
+It supports a range of devices that are typically found in the Internet of Things (IoT):
+*8-bit*, *16-bit* and *32-bit* microcontrollers.
 
-## GETTING STARTED
-* You want to start the RIOT? Just follow our [Getting started documentation](https://github.com/RIOT-OS/RIOT/wiki/Introduction)
-* The RIOT API itself can be built from the code using doxygen. The latest version is uploaded daily to http://riot-os.org/api.
+RIOT is based on the following design principles: **energy-efficiency, real-time
+capabilities, small memory footprint, modularity, and uniform API access,**
+independent of the underlying hardware (this API offers partial POSIX
+compliance).
 
-### USING THE NATIVE PORT WITH NETWORKING
-If you compile RIOT for the native cpu and include the nativenet module, you can specify a network interface like this: `PORT=tap0 make term`
+RIOT is developed by an international open source community which is
+independent of specific vendors (e.g. similarly to the Linux community).
+RIOT is licensed with **LGPLv2.1**, a copyleft license which fosters
+indirect business models around the free open-source software platform
+provided by RIOT, e.g. it is possible to link closed-source code with the
+LGPL code.
 
-#### SETTING UP A TAP NETWORK
-There is a shellscript in `RIOT/cpu/native` called `tapsetup.sh` which you can use to create a network of tap interfaces.
+[ci-badge]: https://ci.riot-os.org/job/branch/master/badge
+[ci-link]: https://ci.riot-os.org/details/branch/master
+[release-badge]: https://img.shields.io/github/release/RIOT-OS/RIOT.svg
+[release-link]: https://github.com/RIOT-OS/RIOT/releases/latest
+[license-badge]: doc/resources/badge-license.svg
+[license-link]: https://github.com/RIOT-OS/RIOT/blob/master/LICENSE
+[api-badge]: doc/resources/badge-api.svg
+[api-link]: https://api.riot-os.org/
+[guide-badge]: doc/resources/badge-guide.svg
+[guide-link]: https://guide.riot-os.org/getting-started/installing/
+[mastodon-badge]: doc/resources/badge-mastodon.svg
+[mastodon-link]: https://floss.social/@RIOT_OS
+[matrix-badge]: doc/resources/badge-matrix.svg
+[matrix-link]: https://matrix.to/#/#riot-os:matrix.org
 
-*USAGE*
-To create a bridge and two (or count at your option) tap interfaces:
-./tapsetup.sh create [count]
+## Getting Started
 
-### EXAMPLE APPLICATIONS
-In the `examples` directory you can find some example applications. The `default` application demonstrates all available features for the current platform.
+- **Start here:**
+  Our comprehensive [Getting Started Guide][getting-started]
+  walks you through installation and your first RIOT applications.
+- **Learn by doing:**
+  - Try our [hands-on tutorials][tutorials] designed for beginners
+  - Take the [RIOT online course][riot-course] at your own pace
+- **Explore the API:** Check out the [API documentation][api-docs]
+  for detailed information on RIOT's features and functions.
 
-For example, you can use it to the test the native networking by running two instances: `make term PORT=tap0` and `make term PORT=tap1`. Now configure two different addresses for both RIOT instances by typing `addr 1` and `addr 2` respectively and send a text message from one "node" to another by typing `txtsnd 2 hello` on the first "node".
+[getting-started]: https://guide.riot-os.org/getting-started/installing/
+[tutorials]: https://github.com/RIOT-OS/Tutorials
+[riot-course]: https://github.com/RIOT-OS/riot-course
+[api-docs]: https://api.riot-os.org/
 
-## CONTRIBUTE
+## Contributing
 
-To contribute something to RIOT, please refer to the [development procedures](https://github.com/RIOT-OS/RIOT/wiki/Development-procedures) and read all notes for best practice.
+RIOT is developed by its community, and contributions of all kinds are welcome:
+code, documentation, bug reports, and reviews. If this is your first time
+with RIOT consider first following our [Getting Started Guides][getting-started].
 
-## MAILING LISTS
-* RIOT OS kernel developers list
- * devel@riot-os.org (http://lists.riot-os.org/mailman/listinfo/devel)
-* RIOT OS users list
- * users@riot-os.org (http://lists.riot-os.org/mailman/listinfo/users)
-* RIOT commits
- * commits@riot-os.org (http://lists.riot-os.org/mailman/listinfo/commits)
-* Github notifications
- * notifications@riot-os.org  (http://lists.riot-os.org/mailman/listinfo/notifications)
+- **Start here:** Our [contributing document][contributing] explains the
+  workflow, commit conventions, and review process.
+- **Follow the style:** Make sure your changes comply with our
+  [coding conventions][coding-conventions]. You can run `make static-test` to
+  check them before opening a pull request.
+- **Declare AI tool usage:** All pull requests require a declaration of
+  AI/LLM usage. If you use AI tools, please also read our
+  [AI Policy][ai-policy].
 
-## LICENSE
-* All sources and binaries that have been developed at Freie Universität Berlin are
-  licensed under the GNU Lesser General Public License version 2.1 as published by the
-  Free Software Foundation.
-* Some external sources, especially files developed by SICS are published under
+All relevant information around contributing to RIOT can also be found in our
+[Developing RIOT Guides][developing-guide].
+
+[contributing]: CONTRIBUTING.md
+[coding-conventions]: CODING_CONVENTIONS.md
+[ai-policy]: https://doc.riot-os.org/general/ai_policy
+[developing-guide]: https://doc.riot-os.org/general/contributing/
+
+## Features
+
+RIOT provides features including, but not limited to:
+
+- **Platforms:** [300+ boards][boards] based on 8/16/32-bit AVR, MSP430, ARM7,
+  ARM Cortex-M, RISC-V, ESP8266, ESP32 MCUs and more. Multiple native development
+  instances can be interconnected via a virtual Ethernet bridge
+  or a simulated IEEE 802.15.4 network (ZEP).
+- **Programming environment:** Write native code in C, C++, or Rust, relying
+  on POSIX APIs, uniform hardware abstractions, and standard embedded Rust
+  interfaces. Dynamic runtimes include MicroPython, JavaScript, Lua,
+  and WebAssembly (WAMR).
+- **Packages:** A large third-party package ecosystem covering GUIs (LVGL),
+  USB (TinyUSB), machine learning (TensorFlow Lite Micro, emlearn),
+  serialization (Nanopb, FlatBuffers), an embedded database (FlashDB), the
+  Embedded Template Library (ETL), Arduino API compatibility, and
+  compression and parsing (heatshrink, LZ4, jsmn, mjson).
+- **Networking and protocols:** IPv6 and IPv4 (lwIP), 6LoWPAN, IEEE 802.15.4,
+  Ethernet (also via USB), SLIP/ethos, and DOSE (Differentially Operated
+  Serial Ethernet), TCP and UDP, RPL, CoAP, MQTT and MQTT-SN, LwM2M, DNS,
+  DHCPv6, and SNTP, CCN-Lite, and SCHC.
+- **Wireless:** Bluetooth Low Energy via NimBLE, Thread via OpenThread,
+  LoRaWAN, and UWB.
+- **System:** A preemptive, tickless scheduler with priorities and optional
+  round-robin, flexible memory management, high-resolution and long-term
+  timers, an MTD abstraction, file systems, a shell,
+  and the SAUL sensor/actuator registry.
+- **Security:** SUIT OTA updates, the PSA Crypto API, DTLS/TLS (tinyDTLS,
+  Mbed TLS, wolfSSL), EDHOC, OSCORE, and FIDO2.
+- **Device drivers:** SPI, I2C, UART, USB, CAN, RTC, PWM, timers, ADC
+  and DAC, environmental, IMU, magnetometer, particulate matter, and GNSS
+  sensors, servos, motors, dimmers, switches, RGB LEDs, displays, and
+  touchscreens.
+
+[boards]: https://doc.riot-os.org/boards/
+
+## Community
+
+You can ask for help on the Forum or on Matrix. Please send bug reports and
+feature requests to our [GitHub issue tracker][issues]
+
+- The [Forum][forum] is the default place to start asking for
+  help. Our Forum provides an archive of prior questions and answers.
+- For chat, we use
+  [#riot-os:matrix.org][matrix-chat] on the
+  [Matrix][matrix] chat network.
+
+### Governance
+
+For how our community is structured and governed,
+please see our [governance document][governance].
+
+### Collaboration
+
+RIOT closely collaborates with and inspires other open source projects,
+e.g., [Ariel OS][ariel], an IoT OS written in Rust.
+We are more than happy to collaborate with those who share our
+[vision][vision].
+
+[issues]: https://github.com/RIOT-OS/RIOT/issues
+[forum]: https://forum.riot-os.org
+[matrix-chat]: https://matrix.to/#/#riot-os:matrix.org
+[matrix]: https://matrix.org/
+[governance]: https://guide.riot-os.org/general/governance/
+[ariel]: https://ariel-os.org/
+[vision]: https://guide.riot-os.org/general/vision/
+
+## License
+
+- Most of the code developed by the RIOT community is licensed under the GNU
+  Lesser General Public License (LGPL) version 2.1 as published by the Free
+  Software Foundation.
+- Some external sources, especially files developed by SICS are published under
   a separate license.
 
 All code files contain licensing information.
 
-For more information, see the RIOT website:
+For more information, see the [RIOT website][riot-website].
 
-http://www.riot-os.org
+[riot-website]: https://www.riot-os.org

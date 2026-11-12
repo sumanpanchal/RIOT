@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -13,9 +12,6 @@
  * @brief   Synchronization barriers.
  * @note    Do not include this header file directly, but pthread.h.
  */
-
-#ifndef __SYS__POSIX__PTHREAD_BARRIER__H
-#define __SYS__POSIX__PTHREAD_BARRIER__H
 
 #include "mutex.h"
 
@@ -54,7 +50,7 @@ typedef struct pthread_barrier_waiting_node
  *            For a zeroed out datum you do not need to call the initializer,
  *            it is enough to set pthread_barrier_t::count.
  */
-typedef struct pthread_barrier
+typedef struct
 {
     struct pthread_barrier_waiting_node *next; /**< The first waiting thread. */
     mutex_t mutex; /**< Mutex to unlock to wake the thread up. */
@@ -66,7 +62,7 @@ typedef struct pthread_barrier
  * @details   RIOT does not need this structure, because it is a single process OS.
  *            This is only here to POSIX compatibility.
  */
-typedef struct pthread_barrierattr
+typedef struct
 {
     int pshared; /**< See pthread_barrierattr_setpshared() and pthread_barrierattr_getpshared(). */
 } pthread_barrierattr_t;
@@ -86,7 +82,7 @@ int pthread_barrier_init(pthread_barrier_t *barrier,
  * @brief     Destroys a pthread_barrier_t
  * @details   To use the barrier again you will need to call pthread_barrier_init() again.
  *            Destroying a barrier while threads are currently waiting for it causes indefined behavior.
- * @param     barrier   Barrier to destoy
+ * @param     barrier   Barrier to destroy
  * @returns   0, the invocation cannot fail
  */
 int pthread_barrier_destroy(pthread_barrier_t *barrier);
@@ -125,7 +121,7 @@ int pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshar
 
 /**
  * @brief     Set if the barrier should be shared with child processes
- * @details   Since RIOT is a single process OS, pthread_barrier_init() wil ignore the value.
+ * @details   Since RIOT is a single process OS, pthread_barrier_init() will ignore the value.
  * @param     attr      Attribute set for pthread_barrier_init()
  * @param     pshared   Either #PTHREAD_PROCESS_PRIVATE or #PTHREAD_PROCESS_SHARED
  * @returns   0, the invocation cannot fail
@@ -134,8 +130,6 @@ int pthread_barrierattr_setpshared(pthread_barrierattr_t *attr, int pshared);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

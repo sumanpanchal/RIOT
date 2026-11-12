@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Hamburg University of Applied Sciences (HAW)
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 HAW Hamburg
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -14,9 +13,6 @@
  * @author      Martin Landsmann <martin.landsmann@haw-hamburg.de>
  * @author      René Kijewski <rene.kijewski@fu-berlin.de>
  */
-
-#ifndef __SYS__POSIX__PTHREAD_TLS__H
-#define __SYS__POSIX__PTHREAD_TLS__H
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +53,7 @@ int pthread_setspecific(pthread_key_t key, const void *value);
 /**
  * @brief Creates a new key to be used to identify a specific tls
  * @param[out] key the created key is scribed to the given pointer
- * @param[in] destructor function pointer called when non NULL just befor the pthread exits
+ * @param[in] destructor function pointer called when non NULL just before the pthread exits
  * @return returns 0 on success, an errorcode otherwise
  */
 int pthread_key_create(pthread_key_t *key, void (*destructor)(void *));
@@ -87,5 +83,6 @@ struct __pthread_tls_datum **__pthread_get_tls_head(int self_id) PURE;
 }
 #endif
 
-#endif /* __SYS__POSIX__PTHREAD_TLS__H */
-/** @} */
+/**
+ * @}
+ */

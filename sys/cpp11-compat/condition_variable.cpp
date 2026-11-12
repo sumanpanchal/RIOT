@@ -18,13 +18,14 @@
  * @}
  */
 
-#include <cstdio>
 #include <stdexcept>
 #include <system_error>
 
 #include "irq.h"
 #include "sched.h"
-#include "vtimer.h"
+#include "thread.h"
+#include "time_units.h"
+#include "ztimer64.h"
 #include "priority_queue.h"
 
 #include "riot/condition_variable.hpp"
@@ -36,85 +37,81 @@ namespace riot {
 condition_variable::~condition_variable() { m_queue.first = NULL; }
 
 void condition_variable::notify_one() noexcept {
-  unsigned old_state = disableIRQ();
+  unsigned old_state = irq_disable();
   priority_queue_node_t* head = priority_queue_remove_head(&m_queue);
   int other_prio = -1;
   if (head != NULL) {
-    tcb_t* other_thread = (tcb_t*)sched_threads[head->data];
+    thread_t* other_thread = (thread_t*)sched_threads[head->data];
     if (other_thread) {
       other_prio = other_thread->priority;
       sched_set_status(other_thread, STATUS_PENDING);
     }
-    head->data = -1u;
+    head->data = PRIORITY_QUEUE_DATA_SIGNALING;
   }
-  restoreIRQ(old_state);
+  irq_restore(old_state);
   if (other_prio >= 0) {
     sched_switch(other_prio);
   }
 }
 
 void condition_variable::notify_all() noexcept {
-  unsigned old_state = disableIRQ();
+  unsigned old_state = irq_disable();
   int other_prio = -1;
   while (true) {
     priority_queue_node_t* head = priority_queue_remove_head(&m_queue);
     if (head == NULL) {
       break;
     }
-    tcb_t* other_thread = (tcb_t*)sched_threads[head->data];
+    thread_t* other_thread = (thread_t*)sched_threads[head->data];
     if (other_thread) {
       auto max_prio
         = [](int a, int b) { return (a < 0) ? b : ((a < b) ? a : b); };
       other_prio = max_prio(other_prio, other_thread->priority);
       sched_set_status(other_thread, STATUS_PENDING);
     }
-    head->data = -1u;
+    head->data = PRIORITY_QUEUE_DATA_SIGNALING;
   }
-  restoreIRQ(old_state);
+  irq_restore(old_state);
   if (other_prio >= 0) {
     sched_switch(other_prio);
   }
 }
 
 void condition_variable::wait(unique_lock<mutex>& lock) noexcept {
-  if (!lock.owns_lock()) {
-    throw std::system_error(
-      std::make_error_code(std::errc::operation_not_permitted),
-      "Mutex not locked.");
-  }
   priority_queue_node_t n;
-  n.priority = sched_active_thread->priority;
-  n.data = sched_active_pid;
+  n.priority = thread_get_active()->priority;
+  n.data = thread_getpid();
   n.next = NULL;
   // the signaling thread may not hold the mutex, the queue is not thread safe
-  unsigned old_state = disableIRQ();
+  unsigned old_state = irq_disable();
   priority_queue_add(&m_queue, &n);
-  restoreIRQ(old_state);
+  irq_restore(old_state);
   mutex_unlock_and_sleep(lock.mutex()->native_handle());
-  if (n.data != -1u) {
-    // on signaling n.data is set to -1u
+  if (n.data != PRIORITY_QUEUE_DATA_SIGNALING) {
+    // on signaling n.data is set to PRIORITY_QUEUE_DATA_SIGNALING
     // if it isn't set, then the wakeup is either spurious or a timer wakeup
-    old_state = disableIRQ();
+    old_state = irq_disable();
     priority_queue_remove(&m_queue, &n);
-    restoreIRQ(old_state);
+    irq_restore(old_state);
   }
   mutex_lock(lock.mutex()->native_handle());
 }
 
 cv_status condition_variable::wait_until(unique_lock<mutex>& lock,
                                          const time_point& timeout_time) {
-  vtimer_t timer;
-  // todo: use function to wait for absolute timepoint once available
-  timex_t before;
-  vtimer_now(&before);
-  auto diff = timex_sub(timeout_time.native_handle(), before);
-  vtimer_set_wakeup(&timer, diff, sched_active_pid);
+  ztimer64_t timer;
+  uint64_t total_timeout_time_us = timeout_time.microseconds();
+  total_timeout_time_us += timeout_time.seconds() * US_PER_SEC;
+
+  ztimer64_set_wakeup_at(ZTIMER64_USEC, &timer, total_timeout_time_us,
+                         thread_getpid());
   wait(lock);
-  timex_t after;
-  vtimer_now(&after);
-  vtimer_remove(&timer);
-  auto cmp = timex_cmp(after, timeout_time.native_handle());
-  return cmp < 1 ? cv_status::no_timeout : cv_status::timeout;
+  if (ztimer64_now(ZTIMER64_USEC) >= total_timeout_time_us) {
+    ztimer64_remove(ZTIMER64_USEC, &timer);
+    return cv_status::timeout;
+  }
+  ztimer64_remove(ZTIMER64_USEC, &timer);
+  return cv_status::no_timeout;
 }
 
 } // namespace riot

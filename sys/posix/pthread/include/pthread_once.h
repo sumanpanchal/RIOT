@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 René Kijewski <rene.kijewski@fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -14,24 +13,27 @@
  * @note    Do not include this header file directly, but pthread.h.
  */
 
-#ifndef __SYS__POSIX__PTHREAD_ONCE__H
-#define __SYS__POSIX__PTHREAD_ONCE__H
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
  * @brief           Datatype to supply to pthread_once().
+ * @details         This data type must be compatible with the one defined
+ *                  in newlib's `include/sys/_pthreadtypes.h`.
  */
-typedef volatile int pthread_once_t;
+typedef struct {
+  int   is_initialized;  /**< initialized */
+  int   init_executed;   /**< init function executed */
+} pthread_once_t;
 
 /**
  * @def             PTHREAD_ONCE_INIT
  * @brief           Initialization for pthread_once_t.
- * @details         A zeroed out pthread_once_t is initialized.
+ * @details         pthread_once_t variables are declared as initialized, but
+ *                  the init function is not yet executed.
  */
-#define PTHREAD_ONCE_INIT 0
+#define PTHREAD_ONCE_INIT  { 1, 0 }
 
 /**
  * @brief           Helper function that ensures that `init_routine` is called at once.
@@ -46,8 +48,6 @@ int pthread_once(pthread_once_t *once_control, void (*init_routine)(void));
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

@@ -1,25 +1,20 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser General
- * Public License v2.1. See the file LICENSE in the top level directory for more
- * details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    boards_stm32f3discovery STM32F3Discovery
- * @ingroup     boards
- * @brief       Board specific files for the STM32F3Discovery board
+ * @ingroup     boards_stm32f3discovery
  * @{
  *
  * @file
  * @brief       Board specific definitions for the STM32F3Discovery evaluation board
  *
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
+ * @author      Sebastian Meiling <s@mlng.net>
  */
-
-#ifndef BOARD_H_
-#define BOARD_H_
 
 #include "cpu.h"
 
@@ -28,84 +23,71 @@ extern "C" {
 #endif
 
 /**
- * Define the nominal CPU core clock in this board
- */
-#define F_CPU               (72000000UL)
-
-/**
- * @name Assign the hardware timer
- */
-#define HW_TIMER            TIMER_0
-
-/**
- * @name Define the UART used for stdio
- * @{
- */
-#define STDIO               UART_0
-#define STDIO_BAUDRATE      (115200U)
-#define STDIO_RX_BUFSIZE    (64U)
-/** @} */
-
-/**
- * @name LED pin definitions
- * @{
- */
-#define LED_PORT            GPIOE
-#define LD3_PIN             (1 << 9)
-#define LD4_PIN             (1 << 8)
-#define LD5_PIN             (1 << 10)
-#define LD6_PIN             (1 << 15)
-#define LD7_PIN             (1 << 11)
-#define LD8_PIN             (1 << 14)
-#define LD9_PIN             (1 << 12)
-#define LD10_PIN            (1 << 13)
-/** @} */
-
-/**
  * @name Macros for controlling the on-board LEDs.
  * @{
  */
-#define LD3_ON              (LED_PORT->BSRRL = LD3_PIN)
-#define LD3_OFF             (LED_PORT->BSRRH = LD3_PIN)
-#define LD3_TOGGLE          (LED_PORT->ODR ^= LD3_PIN)
-#define LD4_ON              (LED_PORT->BSRRL = LD4_PIN)
-#define LD4_OFF             (LED_PORT->BSRRH = LD4_PIN)
-#define LD4_TOGGLE          (LED_PORT->ODR ^= LD4_PIN)
-#define LD5_ON              (LED_PORT->BSRRL = LD5_PIN)
-#define LD5_OFF             (LED_PORT->BSRRH = LD5_PIN)
-#define LD5_TOGGLE          (LED_PORT->ODR ^= LD5_PIN)
-#define LD6_ON              (LED_PORT->BSRRL = LD6_PIN)
-#define LD6_OFF             (LED_PORT->BSRRH = LD6_PIN)
-#define LD6_TOGGLE          (LED_PORT->ODR ^= LD6_PIN)
-#define LD7_ON              (LED_PORT->BSRRL = LD7_PIN)
-#define LD7_OFF             (LED_PORT->BSRRH = LD7_PIN)
-#define LD7_TOGGLE          (LED_PORT->ODR ^= LD7_PIN)
-#define LD8_ON              (LED_PORT->BSRRL = LD8_PIN)
-#define LD8_OFF             (LED_PORT->BSRRH = LD8_PIN)
-#define LD8_TOGGLE          (LED_PORT->ODR ^= LD8_PIN)
-#define LD9_ON              (LED_PORT->BSRRL = LD9_PIN)
-#define LD9_OFF             (LED_PORT->BSRRH = LD9_PIN)
-#define LD9_TOGGLE          (LED_PORT->ODR ^= LD9_PIN)
-#define LD10_ON             (LED_PORT->BSRRL = LD10_PIN)
-#define LD10_OFF            (LED_PORT->BSRRH = LD10_PIN)
-#define LD10_TOGGLE         (LED_PORT->ODR ^= LD10_PIN)
-/* for compatability to other boards */
-#define LED_GREEN_ON        LD4_ON
-#define LED_GREEN_OFF       LD4_OFF
-#define LED_GREEN_TOGGLE    LD4_TOGGLE
-#define LED_RED_ON          LD5_ON
-#define LED_RED_OFF         LD5_OFF
-#define LED_RED_TOGGLE      LD5_TOGGLE
+#define LED0_PIN_NUM        9
+#define LED0_PORT           GPIO_PORT_E /**< GPIO port of LED 0 */
+#define LED0_PORT_NUM       PORT_E
+
+#define LED1_PIN_NUM        8
+#define LED1_PORT           GPIO_PORT_E /**< GPIO port of LED 1 */
+#define LED1_PORT_NUM       PORT_E
+
+#define LED2_PIN_NUM        10
+#define LED2_PORT           GPIO_PORT_E /**< GPIO port of LED 2 */
+#define LED2_PORT_NUM       PORT_E
+
+#define LED3_PIN_NUM        15
+#define LED3_PORT           GPIO_PORT_E /**< GPIO port of LED 3 */
+#define LED3_PORT_NUM       PORT_E
+
+#define LED4_PIN_NUM        11
+#define LED4_PORT           GPIO_PORT_E /**< GPIO port of LED 4 */
+#define LED4_PORT_NUM       PORT_E
+
+#define LED5_PIN_NUM        14
+#define LED5_PORT           GPIO_PORT_E /**< GPIO port of LED 5 */
+#define LED5_PORT_NUM       PORT_E
+
+#define LED6_PIN_NUM        12
+#define LED6_PORT           GPIO_PORT_E /**< GPIO port of LED 6 */
+#define LED6_PORT_NUM       PORT_E
+
+#define LED7_PIN_NUM        13
+#define LED7_PORT           GPIO_PORT_E /**< GPIO port of LED 7 */
+#define LED7_PORT_NUM       PORT_E
 /** @} */
 
 /**
- * @brief Initialize board specific hardware, including clock, LEDs and std-IO
+ * @name User button
+ * @{
  */
-void board_init(void);
+#define BTN0_PIN            GPIO_PIN(PORT_A, 0)
+#define BTN0_MODE           GPIO_IN
+/** @} */
+
+/**
+ * @name LSM303DLHC magnetometer data ready pin
+ * @{
+ */
+#define LSM303DLHC_PARAM_MAG_PIN    GPIO_PIN(PORT_E, 2)
+/** @} */
+
+/**
+ * @name L3GD20 (Rev. C01, D01), I3G4250D (Rev. E02)
+ * @{
+ */
+#define L3GXXXX_SPI_DEV     SPI_DEV(0)          /**< SPI bus used for L3Gxxxx */
+#define L3GXXXX_SPI_CS      GPIO_PIN(PORT_E, 3) /**< SPI CS pin used for L3Gxxxx */
+#define L3GXXXX_INT1_PIN    GPIO_PIN(PORT_E, 0) /**< INT1 pin used for L3Gxxxx */
+#define L3GXXXX_INT2_PIN    GPIO_PIN(PORT_E, 1) /**< INT2/DRDY pin used for L3Gxxxx */
+/** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BOARD_H_ */
+#include "stm32_leds.h"
+
 /** @} */

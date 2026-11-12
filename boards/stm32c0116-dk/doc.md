@@ -1,0 +1,45 @@
+@defgroup    boards_stm32c0116-dk STM32C0116-DK
+@ingroup     boards
+@brief       Support for the STM32C0116-DK board.
+
+## General information
+
+The ST [STM32C0116-DK](https://www.st.com/en/evaluation-tools/stm32c0116-dk.html)
+is an evaluation board supporting a ARM Cortex-M0 STM32C011F6 microcontroller
+with 8KB of RAM and 32KB of ROM Flash.
+
+## Pinout
+
+See [this application note as reference](https://www.st.com/resource/en/application_note/an5673-getting-started-with-stm32c0-mcu-hardware-development-stmicroelectronics.pdf).
+This means the responsibility is on the firmware configurer to take special
+care when configuring IO, ensuring that ports are not conflicting on each pin.
+
+## MCU
+
+| MCU        | STM32C011F6         |
+|:---------- |:------------------- |
+| Family     | ARM Cortex-M0+      |
+| Vendor     | ST Microelectronics |
+| RAM        | 8KiB                |
+| Flash      | 32KiB               |
+| Frequency  | up to 48MHz (set to 48MHz on RIOT) |
+| FPU        | no                  |
+| Timers     | 8 (2x watchdog, 1 SysTick, 5x 16-bit) |
+| ADCs       | 1x 12-bit (up to 15 channels) |
+| UARTs      | 2                  |
+| SPIs       | 1                  |
+| I2Cs       | 1                  |
+| RTC        | 1                  |
+| Vcc        | 2.0V - 3.6V        |
+| Datasheet  | [Datasheet](https://www.st.com/resource/en/datasheet/stm32c011f6.pdf) |
+| Reference Manual | [Reference Manual](https://www.st.com/resource/en/reference_manual/rm0490-stm32c0x1-advanced-armbased-32bit-mcus-stmicroelectronics.pdf) |
+| Programming Manual | [Programming Manual](https://www.st.com/resource/en/programming_manual/pm0223-stm32-cortexm0-mcus-programming-manual-stmicroelectronics.pdf) |
+| Board Manual   | [Board Manual](https://www.st.com/resource/en/user_manual/um2970-discovery-kit-with-stm32c011f6-mcu-stmicroelectronics.pdf) |
+
+## Flashing the Board
+
+A detailed description about the flashing process can be found on the
+[guides page](https://guide.riot-os.org/board_specific/stm32/).
+The board name for the STM32C0116-DK is `stm32c0116-dk` and the default
+programmer is OpenOCD. Please note that the STM32C0 series is only supported by
+OpenOCD versions newer than 0.12.0.

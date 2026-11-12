@@ -1,0 +1,82 @@
+@defgroup    boards_stm32f469i-disco STM32F469I-DISCO
+@ingroup     boards
+@brief       Support for the STM32F469I-DISCO board
+
+## Overview
+
+The STM32F469I Discovery kit is a complete development platform for powered by ARM Cortex-M4 core-based
+STM32F469NIH6 MCU.
+The MCU presents a large list of peripherals available, but specifically this development board exposes:
+
+## Hardware
+
+| MCU               | STM32F469Ixx            |
+|:----------------- |:------------------------|
+| Family            | ARM Cortex-M4F          |
+| Vendor            | ST Microelectronics     |
+| RAM               | 384+4 KiB               |
+| Flash             | 2 MiB                   |
+| Frequency         | 180 MHz                 |
+| FPU               | Yes                     |
+| Timers            | 12                      |
+| ADCs              | 3 12-bit (16 channels each) |
+| DACs              | 2 12-bit                |
+| USARTs            | 4                       |
+| UARTs             | 4                       |
+| SPIs              | 6                       |
+| I2Cs              | 3                       |
+| I2Ss              | 2                       |
+| CANs              | 2                       |
+| USBs              | 1 Full Speed            |
+| Ethernet MAC      | Yes                     |
+| RNG               | Yes                     |
+| SDRAM             | Yes (16 MByte)          |
+| Vcc               | 1.7V - 3.6V             |
+| Datasheet         | [MCU Datasheet](https://www.st.com/resource/en/datasheet/stm32f469ae.pdf) (pdf) |
+| Reference Manual  | [Dev-Kit Reference Manual](https://www.st.com/resource/en/user_manual/um1932-discovery-kit-with-stm32f469ni-mcu-stmicroelectronics.pdf) (pdf)|
+
+## Connectors and Pinout
+
+- 1 USB Mini-B used by the On-board ST-LINK debugger (Ref.CN1)
+- 1 USB Micro-AB Full speed (Ref. CN13)
+- Arduino(R) Uno expansion connectors (Refs. CN5/6/7/8)
+- microSD(tm) card receptacle.
+- Audio 3.5 mm stereo jack
+
+Through 2 connector we have available:
+
+### CN11
+
+- I2C1
+- Reset
+
+Also provides power pins, 3V3 and GND
+
+### CN12
+
+This extension connector gives access to:
+
+- CAN2
+- USART6 (Tx, Rx)
+- I2S2
+- SPI1
+- 7 timers channels
+- Speaker output (1W)
+
+Also provides some system signals and power.
+
+**Important!** note than some pins are shared between peripherals.
+
+## Buttons, LEDS and other devices
+
+- 1 Button for reset
+- 1 User button
+- 4 LEDs
+- 3 Digital microphones
+- 1 LCD Color 4 inches
+
+## Flashing the Board
+
+A detailed description about the flashing process can be found on the
+[guides page](https://guide.riot-os.org/board_specific/stm32/).
+The board name for the STM32F469I Discovery is `stm32f469i-disco`.

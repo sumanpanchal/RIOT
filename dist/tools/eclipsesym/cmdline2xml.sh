@@ -1,12 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright (C) 2015 Eistec AB
-#
-# This file is subject to the terms and conditions of the GNU Lesser General
-# Public License v2.1. See the file LICENSE in the top level directory for more
-# details.
+# SPDX-FileCopyrightText: 2015 Eistec AB
+# SPDX-License-Identifier: LGPL-2.1-only
 
-# Author: Joakim Gebart <joakim.gebart@eistec.se>
+# Author: Joakim Nohlgård <joakim.nohlgard@eistec.se>
 
 # Convert a GCC command line to Eclipse settings for import in
 # Project->Properties->C/C++ General->Paths and Symbols
@@ -26,9 +23,11 @@ if [ $# -ne 0 ]; then
     exit 2
 fi
 
+readlink () { echo $(cd $(dirname $1); pwd)/$(basename $1); }
+
 XML_INSTRUCTIONS='
 <!--
-Instrucions:
+Instructions:
 
 In Eclipse:
 1. Open the project properties, menu Project->Properties
@@ -53,18 +52,18 @@ ECLIPSE_PROJECT_NAME='RIOT'
 GCCCOMMANDLINE=$(cat)
 
 # Find all includes
-INCLUDES=$(${ECHO} "${GCCCOMMANDLINE}" | sed -e 's/ /\n/g' | egrep '^-I' | cut -c3-)
+INCLUDES=$(${ECHO} "${GCCCOMMANDLINE}" | sed -e 's/ /\n/g' | grep -E '^-I' | cut -c3-)
 
 # Parse and rewrite to project relative paths
 INCLUDES_REL=""
 for p in ${INCLUDES}; do
     #ABSPATH=$(readlink -m "$p")
-    RELPATH=$(readlink -m "$p" | sed -e "s,^${RIOTBASE},/${ECLIPSE_PROJECT_NAME}/,")
+    RELPATH=$(readlink "$p" | sed -e "s,^${RIOTBASE},/${ECLIPSE_PROJECT_NAME}/,")
     INCLUDES_REL=${INCLUDES_REL}$'\n'${RELPATH}
 done
 
 # Grab macro definitions
-MACROS=$(${ECHO} "${GCCCOMMANDLINE}" | sed -e 's/ /\n/g' | egrep '^-D' | cut -c3-)
+MACROS=$(${ECHO} "${GCCCOMMANDLINE}" | sed -e 's/ /\n/g' | grep -E '^-D' | cut -c3-)
 
 # Output
 ${ECHO} "${XML_HEADER}"

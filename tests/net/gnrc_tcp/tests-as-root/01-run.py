@@ -1,0 +1,880 @@
+#!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2021 Simon Brummer <simon.brummer@posteo.de>
+# SPDX-License-Identifier: LGPL-2.1-only
+
+import os
+import sys
+import random
+import pexpect
+import base64
+import time
+
+from scapy.all import Ether, IPv6, TCP, raw, sendp
+
+from helpers import Runner, RiotTcpServer, RiotTcpClient, HostTcpServer, HostTcpClient, \
+                    generate_port_number, sudo_guard
+
+# Custom NO_TIMEOUT constant. Note: the value must match
+# with CUSTOM_GNRC_TCP_NO_TIMEOUT from the makefile
+_GNRC_TCP_NO_TIMEOUT = 1
+
+
+@Runner(timeout=5)
+def test_connection_lifecycle_as_client(child):
+    """Open/close a single connection as TCP client."""
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup Riot as client
+        with RiotTcpClient(child, host_srv):
+            # Accept and close connection
+            host_srv.accept()
+            host_srv.close()
+
+
+@Runner(timeout=10)
+def test_connection_lifecycle_as_server(child):
+    """Open/close a single connection as TCP server."""
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Setup host as client
+        with HostTcpClient(riot_srv):
+            # Accept and close connection
+            riot_srv.accept(timeout_ms=1000)
+            riot_srv.close()
+
+
+@Runner(timeout=10)
+def test_gnrc_tcp_listen_tcb_discards_unread_data_on_reuse(child):
+    """
+    Ensure that a listening TCB is cleared between connections.
+
+    This happens when a client (host) connects, sends data that is not (yet)
+    read by the RIOT application, and then disconnects. The TCB may then be
+    reused for a new connection, which should not see unread data from the
+    previous connection.
+    """
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # First client connects, sends data to the application, never reads and
+        # disconnects.
+        with HostTcpClient(riot_srv) as host_cli_a:
+            riot_srv.accept(timeout_ms=1000)
+
+            leftover = 'AAAAA'
+            host_cli_a.send(leftover)
+            host_cli_a.close()
+
+        # This ensures that the TCB is closed (moved out of CLOSE_WAIT state).
+        riot_srv.close()
+
+        # Second client connects, which will reuse the TCB. It sends data, then
+        # the application reads it.
+        with HostTcpClient(riot_srv) as host_cli_b:
+            riot_srv.accept(timeout_ms=1000)
+
+            payload = 'BBBBB'
+            host_cli_b.send(payload)
+
+            # The application should only see the data from the second client.
+            riot_srv.receive(timeout_ms=1000, sent_payload=payload)
+
+            riot_srv.close()
+
+
+@Runner(timeout=15)
+def test_gnrc_tcp_listen_tcb_accepts_after_rst_in_syn_rcvd(child):
+    """
+    Ensure that a listening TCB still accepts connections after an RST in
+    SYN_RCVD.
+
+    An RST that aborts the handshake moves the TCB from SYN_RCVD directly back
+    to LISTEN, while the connection timeout of SYN_RCVD is still scheduled.
+    That timeout must therefore be unscheduled when entering LISTEN, before
+    the TCB is reused for the next handshake.
+    """
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        host_probe = HostTcpClient(riot_srv)
+
+        ether_ipv6 = (
+            Ether(dst=riot_srv.mac) /
+            IPv6(src=host_probe.address, dst=riot_srv.address)
+        )
+
+        # Abort the handshake with an unexpected RST right after SYN+ACK.
+        for i in range(3):
+            sport = generate_port_number()
+            syn_seq = 1000 + i * 100
+
+            syn = TCP(
+                sport=sport, dport=int(riot_srv.listen_port),
+                flags='S', seq=syn_seq
+            )
+
+            sendp(ether_ipv6 / syn, iface=host_probe.interface, verbose=0)
+            time.sleep(0.2)
+
+            rst = TCP(
+                sport=sport, dport=int(riot_srv.listen_port),
+                flags='R', seq=syn_seq + 1
+            )
+
+            sendp(ether_ipv6 / rst, iface=host_probe.interface, verbose=0)
+            time.sleep(0.2)
+
+        host_probe.sock.close()
+
+        # If the shared event timer got corrupted, the following actual
+        # handshake will never be able to complete.
+        host_final = HostTcpClient(riot_srv)
+        host_final.sock.settimeout(5)
+
+        try:
+            host_final.open()
+        except OSError as exc:
+            raise RuntimeError(
+                'a real, complete handshake could not be established '
+                'after the repeated aborted handshakes: the listening '
+                'TCB (and its shared event timer) is likely corrupted'
+            ) from exc
+
+        riot_srv.accept(timeout_ms=2000)
+        riot_srv.close()
+        host_final.close()
+
+
+@Runner(timeout=15)
+def test_gnrc_tcp_listen_tcb_accepts_after_syn_in_syn_rcvd(child):
+    """
+    Ensure that a listening TCB still accepts connections after a SYN in
+    SYN_RCVD.
+
+    A SYN that aborts the handshake moves the TCB from SYN_RCVD back to LISTEN
+    by way of CLOSED, while the connection timeout of SYN_RCVD is still
+    scheduled. That timeout must therefore be unscheduled when entering
+    LISTEN, before the TCB is reused for the next handshake.
+    """
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        host_probe = HostTcpClient(riot_srv)
+
+        ether_ipv6 = (
+            Ether(dst=riot_srv.mac) /
+            IPv6(src=host_probe.address, dst=riot_srv.address)
+        )
+
+        # Abort the handshake with an unexpected SYN right after SYN+ACK.
+        for i in range(3):
+            sport = generate_port_number()
+            syn_seq = 1000 + i * 100
+
+            syn = TCP(
+                sport=sport, dport=int(riot_srv.listen_port),
+                flags='S', seq=syn_seq
+            )
+
+            sendp(ether_ipv6 / syn, iface=host_probe.interface, verbose=0)
+            time.sleep(0.2)
+
+            unexpected_syn = TCP(
+                sport=sport, dport=int(riot_srv.listen_port),
+                flags='S', seq=syn_seq + 1
+            )
+
+            sendp(ether_ipv6 / unexpected_syn, iface=host_probe.interface, verbose=0)
+            time.sleep(0.2)
+
+        host_probe.sock.close()
+
+        # If the shared event timer got corrupted, the following actual
+        # handshake will never be able to complete.
+        host_final = HostTcpClient(riot_srv)
+        host_final.sock.settimeout(5)
+
+        try:
+            host_final.open()
+        except OSError as exc:
+            raise RuntimeError(
+                'a real, complete handshake could not be established '
+                'after the repeated unexpected SYNs: the listening '
+                'TCB (and its shared event timer) is likely corrupted'
+            ) from exc
+
+        riot_srv.accept(timeout_ms=2000)
+        riot_srv.close()
+        host_final.close()
+
+
+@Runner(timeout=5)
+def test_send_data_from_riot_to_host(child):
+    """Send Data from RIOT node to host system."""
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup RIOT as client
+        with RiotTcpClient(child, host_srv) as riot_cli:
+            # Accept and close connection
+            host_srv.accept()
+
+            # Send Data from RIOT to host system and verify reception
+            data = '0123456789' * 200
+            riot_cli.send(timeout_ms=0, payload_to_send=data)
+            host_srv.receive(data)
+
+            # Teardown connection
+            host_srv.close()
+
+
+@Runner(timeout=5)
+def test_send_data_from_host_to_riot(child):
+    """Send Data from host system to RIOT node."""
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Setup host as client
+        with HostTcpClient(riot_srv) as host_cli:
+            # Accept and close connection
+            riot_srv.accept(timeout_ms=1000)
+
+            # Send Data from host system to RIOT
+            data = '0123456789' * 200
+            host_cli.send(data)
+            riot_srv.receive(timeout_ms=1000, sent_payload=data)
+
+            riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_garbage_packets_short_payload(child):
+    """
+    Receive unusually short payload with timeout.
+
+    Verifies fix for https://github.com/RIOT-OS/RIOT/issues/11999
+    """
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Setup host as client
+        with HostTcpClient(riot_srv) as host_cli:
+            # Accept new connection
+            riot_srv.accept(timeout_ms=2000)
+
+            # Receive 1 byte with timeout, this should block
+            child.sendline('gnrc_tcp_recv 1000000 1')
+            child.expect_exact('gnrc_tcp_recv: argc=3, '
+                               'argv[0] = gnrc_tcp_recv, '
+                               'argv[1] = 1000000, argv[2] = 1')
+
+            # Send 1 byte from host to RIOT
+            assert 1 == host_cli.sock.send(b"f")
+
+            # Receive 1 byte
+            child.expect_exact('gnrc_tcp_recv: received 1', timeout=20)
+
+            # Close connection
+            riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_garbage_packets_short_header(child):
+    """
+    Verify fix for malformed TCP header.
+
+    See https://github.com/RIOT-OS/RIOT/issues/12086
+    """
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+
+        # Construct HostTcpClient to lookup node properties
+        host_cli = HostTcpClient(riot_srv)
+
+        # Try to accept incoming connection from host system.
+        child.sendline('gnrc_tcp_accept 2000')
+
+        # Build malformed short header with SYN Flag
+        tcp_hdr = TCP(
+            dport=int(riot_srv.listen_port), flags="S", sport=2342, seq=1, dataofs=6
+        )
+        tcp_hdr = raw(tcp_hdr)[:-2]
+        sendp(
+            Ether(dst=riot_srv.mac) / IPv6(src=host_cli.address, dst=riot_srv.address) /
+            tcp_hdr, iface=host_cli.interface, verbose=0
+        )
+
+        # Establish normal TCP connection from host system to check if RIOT node
+        # was able to recover from malformed packet
+        with host_cli:
+            child.expect_exact('gnrc_tcp_accept: returns 0')
+
+        riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_garbage_packets_ack_instead_of_sym(child):
+    """
+    Verify that `gnrc_tcp` handles an unexpected ACK.
+
+    Sending an ACK instead of a SYN must not break `gnrc_tcp`.
+    """
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Construct HostTcpClient to lookup node properties
+        host_cli = HostTcpClient(riot_srv)
+
+        # Try to accept incoming connection from host system.
+        # Use timeout of 15s discarding 1000 packages can take a while on smaller platforms
+        child.sendline('gnrc_tcp_accept 15000')
+
+        # Check if debug output is enabled. Send fewer packets on if it is disabled
+        # To ensure that the amount of generated output doesn't break the test
+        debug = child.expect(
+            [pexpect.TIMEOUT, r'GNRC_TCP: Enter "\S+", File: .+\(\d+\)\s'], timeout=1
+        )
+
+        if debug:
+            count = 10
+        else:
+            count = 1000
+
+        # see https://github.com/RIOT-OS/RIOT/pull/12001
+        provided_data = base64.b64decode("rwsQf2pekYLaU+exUBBwgPDKAAA=")
+        tcp_hdr = TCP(provided_data)
+        assert provided_data == raw(tcp_hdr)
+
+        # set destination port to application specific port
+        tcp_hdr.dport = int(riot_srv.listen_port)
+        sendp(
+            Ether(dst=riot_srv.mac) / IPv6(src=host_cli.address, dst=riot_srv.address) /
+            tcp_hdr, iface=host_cli.interface, verbose=0, count=count
+        )
+
+        # check if server actually still works
+        with host_cli:
+            child.expect_exact('gnrc_tcp_accept: returns 0')
+
+        riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_garbage_packets_option_parsing(child):
+    """
+    Verify that malformed options do not break `gnrc_tcp`.
+
+    See https://github.com/RIOT-OS/RIOT/issues/12086
+    """
+    # Setup RIOT as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Construct HostTcpClient to lookup node properties
+        host_cli = HostTcpClient(riot_srv)
+
+        # Try to accept incoming connection from host system.
+        child.sendline('gnrc_tcp_accept 2000')
+
+        tcp_hdr = TCP(
+            dport=int(riot_srv.listen_port), flags="S", sport=2342, seq=1, dataofs=6
+        )
+
+        sendp(
+            Ether(dst=riot_srv.mac) / IPv6(src=host_cli.address, dst=riot_srv.address) /
+            tcp_hdr / b"\x50\x00\x00\x00", iface=host_cli.interface, verbose=0
+        )
+
+        # check if server actually still works
+        with host_cli:
+            child.expect_exact('gnrc_tcp_accept: returns 0')
+
+        riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_recv_behavior_on_closed_connection(child):
+    """Ensure that `gnrc_tcp_recv` does not block if a connection was closed already."""
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup Riot as client
+        with RiotTcpClient(child, host_srv) as riot_cli:
+            # Accept connection
+            host_srv.accept()
+
+            # Transmit data to RIOT client and close connection from host side
+            data = 'test_data_'
+            host_srv.send(payload_to_send=data)
+            host_srv.close()
+
+            # Read half amount of data with huge timeout.
+            # Expectency: direct with verified test data. Timeout doesn't matter
+            half_data_len = int(len(data) / 2)
+            huge_timeout_ms = 1000000000
+            no_timeout_ms = 0
+            riot_cli.receive(timeout_ms=huge_timeout_ms, sent_payload=data[:half_data_len])
+
+            # Read half amount of data without timeout.
+            # Expectency: direct return with verified test data
+            riot_cli.receive(timeout_ms=no_timeout_ms, sent_payload=data[half_data_len:])
+
+            # All received data is read, try to read 1 byte with timeout.
+            # Expectency: fast return despite timeout since the connection is already closed
+            child.sendline('gnrc_tcp_recv {} 1'.format(huge_timeout_ms))
+            child.expect_exact('gnrc_tcp_recv: returns 0')
+
+            # All received data is read, try to read 1 byte without timeout.
+            # Expectency: fast return since the connection is already closed
+            child.sendline('gnrc_tcp_recv {} 1'.format(no_timeout_ms))
+            child.expect_exact('gnrc_tcp_recv: returns 0')
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_recv_behavior_on_zero_length_buffer_size(child):
+    """
+    Verify that `gnrc_tcp_recv` accepts a buffer size of zero.
+
+    The call returns 0 in this case.
+    """
+    with HostTcpServer(generate_port_number()) as host_srv:
+        riot_cli = RiotTcpClient(child, host_srv)
+
+        # Call gnrc_tcp_recv with on data and no timeout on unconnected TCB
+        # This must return -ENOTCONN
+        child.sendline('gnrc_tcp_recv 0 0')
+        child.expect_exact('gnrc_tcp_recv: returns -ENOTCONN')
+
+        with riot_cli:
+            host_srv.accept()
+
+            # Call gnrc_tcp_recv with on data and no timeout
+            # This must return 0 not -EAGAIN
+            child.sendline('gnrc_tcp_recv 0 0')
+            child.expect_exact('gnrc_tcp_recv: returns 0')
+
+            host_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_send_behavior_on_zero_length_buffer_size(child):
+    """
+    Verify that `gnrc_tcp_send` accepts a zero length payload.
+
+    The call returns 0 in this case.
+    """
+    with HostTcpServer(generate_port_number()) as host_srv:
+        riot_cli = RiotTcpClient(child, host_srv)
+
+        # Call gnrc_tcp_send with on data and no timeout on unconnected TCB
+        # This must return -ENOTCONN
+        child.sendline('gnrc_tcp_send 0 0')
+        child.expect_exact('gnrc_tcp_send: returns -ENOTCONN')
+
+        with riot_cli:
+            host_srv.accept()
+
+            # Call gnrc_tcp_send with on data and no timeout
+            # This must return 0 not -EAGAIN
+            child.sendline('gnrc_tcp_send 0 0')
+            child.expect_exact('gnrc_tcp_send: returns 0')
+
+            host_srv.close()
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_ep_from_str(child):
+    """Verify Endpoint construction from string."""
+    # Build funspec
+    valid = '[::]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(valid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns 0')
+    child.expect_exact('Family: AF_INET6')
+    child.expect_exact('Addr: ::')
+    child.expect_exact('Port: 0')
+    child.expect_exact('Netif: 0')
+
+    # Build unspec with port
+    valid = '[::]:8080'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(valid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns 0')
+    child.expect_exact('Family: AF_INET6')
+    child.expect_exact('Addr: ::')
+    child.expect_exact('Port: 8080')
+    child.expect_exact('Netif: 0')
+
+    # Build unspec with interface and port
+    valid = '[::%5]:8080'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(valid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns 0')
+    child.expect_exact('Family: AF_INET6')
+    child.expect_exact('Addr: ::')
+    child.expect_exact('Port: 8080')
+    child.expect_exact('Netif: 5')
+
+    # Build addr, interface and port
+    valid = '[fe80::68bf:dbff:fe05:c35e%5]:8080'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(valid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns 0')
+    child.expect_exact('Family: AF_INET6')
+    child.expect_exact('Addr: fe80::68bf:dbff:fe05:c35e')
+    child.expect_exact('Port: 8080')
+    child.expect_exact('Netif: 5')
+
+
+@Runner(timeout=0.5)
+def test_gnrc_tcp_ep_from_str_returns_EINVAL(child):
+    """Verify faulty endpoint construction from string returns `-EINVAL`."""
+    # Error: No brackets
+    invalid = '::'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error: Too much brackets
+    invalid = '[:]:]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error: Swapped bracket order
+    invalid = ']::['
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error: Empty brackets
+    invalid = '[]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error First char before brackets
+    invalid = 'a[]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error token but no port
+    invalid = '[::]:'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error invalid char in port
+    invalid = '[::]:103f2'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error port out of range
+    invalid = '[::]:65536'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error interface after bracket
+    invalid = '[::]%5'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error interface token bur no interface
+    invalid = '[::%]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error: invalid interface
+    invalid = '[::%5a]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+    # Error: address to short
+    invalid = '[:%5]'
+    child.sendline('gnrc_tcp_ep_from_str {}'.format(invalid))
+    child.expect_exact('gnrc_tcp_ep_from_str: returns -EINVAL')
+
+
+@Runner(timeout=0.5)
+def test_gnrc_tcp_accept_returns_EAGAIN(child):
+    """
+    Verify that `gnrc_tcp_accept` returns `-EAGAIN`.
+
+    This happens if no connection is ready and the timeout is 0.
+    """
+    riot_srv = RiotTcpServer(child, generate_port_number())
+    riot_srv.listen()
+
+    child.sendline('gnrc_tcp_accept 0')
+    child.expect_exact('gnrc_tcp_accept: returns -EAGAIN')
+
+
+@Runner(timeout=1.5)
+def test_gnrc_tcp_accept_returns_ETIMEDOUT(child):
+    """
+    Verify that `gnrc_tcp_accept` returns `-ETIMEDOUT`.
+
+    This happens if no connection is ready and the timeout is not 0.
+    """
+    riot_srv = RiotTcpServer(child, generate_port_number())
+    riot_srv.listen()
+
+    child.sendline('gnrc_tcp_accept 1000')
+    child.expect_exact('gnrc_tcp_accept: returns -ETIMEDOUT')
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_accept_returns_ENOMEM(child):
+    """
+    Verify that `gnrc_tcp_accept` returns `-ENOMEM`.
+
+    This happens if all TCBs already handle a connection.
+    """
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Establish connection to ensure that all TCBs are in use
+        with HostTcpClient(riot_srv):
+            riot_srv.accept(timeout_ms=0)
+
+            # Out of memory accept should return immediately despite a huge timeout.
+            child.sendline('gnrc_tcp_accept 100000000')
+            child.expect_exact('gnrc_tcp_accept: returns -ENOMEM')
+
+
+@Runner(timeout=0.5)
+def test_gnrc_tcp_accept_returns_EINVAL(child):
+    """
+    Verify that `gnrc_tcp_accept` returns `-EINVAL`.
+
+    This happens if `listen` was not called before.
+    """
+    child.sendline('gnrc_tcp_accept 0')
+    child.expect_exact('gnrc_tcp_accept: returns -EINVAL')
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_get_local_returns_0(child):
+    """
+    Verify that `get_local` returns 0 in a connected state.
+
+    The used endpoint contains the expected connection parameters.
+    """
+    local_port = 30423
+
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup Riot as client
+        with RiotTcpClient(child, host_srv, local_port) as riot_cli:
+
+            # Accept connection
+            host_srv.accept()
+
+            # Get and verify local endpoint
+            riot_cli.get_local()
+            child.expect_exact('Endpoint: addr.ipv6={} netif={} port={}'.format(
+                riot_cli.address, riot_cli.interface, riot_cli.port)
+            )
+
+            # Close connection
+            host_srv.close()
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_get_local_returns_EADDRNOTAVAIL(child):
+    """
+    Verify that `get_local` returns `-EADDRNOTAVAIL`.
+
+    This happens if there is no connection.
+    """
+    child.sendline('gnrc_tcp_get_local')
+    child.expect_exact('gnrc_tcp_get_local: returns -EADDRNOTAVAIL')
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_get_remote_returns_0(child):
+    """
+    Verify that `get_remote` returns 0 in a connected state.
+
+    The used endpoint contains the expected connection parameters.
+    """
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup Riot as client
+        with RiotTcpClient(child, host_srv) as riot_cli:
+
+            # Accept connection
+            host_srv.accept()
+
+            # Get and verify local endpoint
+            riot_cli.get_remote()
+            child.expect_exact('Endpoint: addr.ipv6={} netif=0 port={}'.format(
+                host_srv.address, host_srv.listen_port)
+            )
+
+            # Close connection
+            host_srv.close()
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_get_remote_returns_ENOTCONN(child):
+    """
+    Verify that `get_remote` returns `-ENOTCONN`.
+
+    This happens if there is no connection.
+    """
+    child.sendline('gnrc_tcp_get_remote')
+    child.expect_exact('gnrc_tcp_get_remote: returns -ENOTCONN')
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_queue_get_local_returns_0(child):
+    """
+    Verify that `queue_get_local` returns 0 when called after `listen`.
+
+    The endpoint content is as expected.
+    """
+    # Enter listen with accept all address
+    listen_addr = '::'
+    listen_port = generate_port_number()
+    riot_srv = RiotTcpServer(child, listen_port)
+    riot_srv.listen()
+    riot_srv.queue_get_local()
+    child.expect_exact('Endpoint: addr.ipv6=:: netif=0 port={}'.format(
+        listen_port)
+    )
+    riot_srv.stop_listen()
+
+    # Enter listen with specified address
+    listen_addr = 'fe80::4c49:c7ff:fecd:34a3'
+    listen_port = generate_port_number()
+    riot_srv = RiotTcpServer(child, listen_port, listen_addr)
+    riot_srv.listen()
+    riot_srv.queue_get_local()
+    child.expect_exact('Endpoint: addr.ipv6={} netif=0 port={}'.format(
+        listen_addr, listen_port)
+    )
+    riot_srv.stop_listen()
+
+
+@Runner(timeout=1)
+def test_gnrc_tcp_queue_get_local_returns_EADDRNOTAVAIL(child):
+    """
+    Verify that `queue_get_local` returns `-EADDRNOTAVAIL`.
+
+    This happens if `listen` was not called before.
+    """
+    child.sendline('gnrc_tcp_queue_get_local')
+    child.expect_exact('gnrc_tcp_queue_get_local: returns -EADDRNOTAVAIL')
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_accept_respects_GNRC_TCP_NO_TIMEOUT(child):
+    """
+    Verify that `gnrc_tcp_accept` respects `GNRC_TCP_NO_TIMEOUT`.
+
+    `gnrc_tcp_accept` timeout mechanism must be disabled if
+    `GNRC_TCP_NO_TIMEOUT` is set as timeout value.
+    """
+    pexpect_timeout_sec = _GNRC_TCP_NO_TIMEOUT + 1
+
+    riot_srv = RiotTcpServer(child, generate_port_number())
+    riot_srv.listen()
+
+    child.sendline('gnrc_tcp_accept {}'.format(_GNRC_TCP_NO_TIMEOUT))
+
+    # The test is successful if gnrc_tcp_accept does not return before pexpects timeout.
+    # Afterwards the connection must be still able to accept a connection.
+    returned = True
+    try:
+        child.expect_exact('gnrc_tcp_accept: returns', timeout=pexpect_timeout_sec)
+    except pexpect.TIMEOUT:
+        returned = False
+    finally:
+        if returned:
+            raise RuntimeError('gnrc_tcp_accept returned')
+
+    # Ensure that gnrc_tcp_accept returns after the test host connects
+    with HostTcpClient(riot_srv):
+        child.expect_exact('gnrc_tcp_accept: returns 0')
+        riot_srv.close()
+
+
+@Runner(timeout=5)
+def test_gnrc_tcp_recv_respects_GNRC_TCP_NO_TIMEOUT(child):
+    """
+    Verify that `gnrc_tcp_recv` respects `GNRC_TCP_NO_TIMEOUT`.
+
+    `gnrc_tcp_recv` timeout mechanism must be disabled if
+    `GNRC_TCP_NO_TIMEOUT` is set as timeout value.
+    """
+    pexpect_timeout_sec = _GNRC_TCP_NO_TIMEOUT + 1
+    payload = "12345"
+
+    # Setup host as server
+    with HostTcpServer(generate_port_number()) as host_srv:
+        # Setup Riot as client
+        with RiotTcpClient(child, host_srv):
+
+            # Accept connection
+            host_srv.accept()
+
+            # Wait for incoming data blocking.
+            # This gnrc_tcp_recv must not return until some Data was sent.
+            child.sendline('gnrc_tcp_recv {} {}'.format(_GNRC_TCP_NO_TIMEOUT, len(payload)))
+            returned = True
+            try:
+                child.expect_exact('gnrc_tcp_recv: re', timeout=pexpect_timeout_sec)
+            except pexpect.TIMEOUT:
+                returned = False
+            finally:
+                if returned:
+                    raise RuntimeError('gnrc_tcp_recv returned')
+
+            # Send data to unblock gnrc_tcp_recv and teardown the connection
+            host_srv.send(payload)
+            child.expect_exact('gnrc_tcp_recv: received {}'.format(len(payload)))
+            host_srv.close()
+
+
+@Runner(timeout=10)
+def test_connection_listen_accept_cycle(child, iterations=10):
+    """
+    Verify `gnrc_tcp` in a typical server role.
+
+    Accept a connection, exchange data, teardown connection, handle the next one.
+    """
+    # Setup RIOT Node as server
+    with RiotTcpServer(child, generate_port_number()) as riot_srv:
+        # Establish multiple connections iterativly
+        for i in range(iterations):
+            print('\n    Running listen/accept iteration {}'.format(i), end='')
+
+            with HostTcpClient(riot_srv) as host_cli:
+                # Accept connection from host system
+                riot_srv.accept(timeout_ms=0)
+
+                # Send data from host to RIOT
+                data = '0123456789'
+                host_cli.send(payload_to_send=data)
+                riot_srv.receive(timeout_ms=500, sent_payload=data)
+
+                # Send data from RIOT to host
+                riot_srv.send(timeout_ms=500, payload_to_send=data)
+                host_cli.receive(sent_payload=data)
+
+                # Randomize connection teardown: The connections
+                # can be either closed or aborted from either
+                # side. Regardless the type of the connection teardown
+                # riot_srv must be able to accept the next connection
+                # Note: python sockets don't offer abort...
+                dice_throw = random.randint(0, 3)
+                if dice_throw == 0:
+                    riot_srv.close()
+                    host_cli.close()
+
+                elif dice_throw == 1:
+                    riot_srv.abort()
+                    host_cli.close()
+
+                elif dice_throw == 2:
+                    host_cli.close()
+                    riot_srv.close()
+
+                elif dice_throw == 3:
+                    host_cli.close()
+                    riot_srv.abort()
+
+
+if __name__ == '__main__':
+    sudo_guard(uses_scapy=True)
+
+    # Read and run all test functions.
+    script = sys.modules[__name__]
+    tests = [getattr(script, t) for t in script.__dict__
+             if type(getattr(script, t)).__name__ == 'function'
+             and t.startswith('test_')]
+
+    for test in tests:
+        res = test()
+        if (res != 0):
+            sys.exit(res)
+
+    print('\n' + os.path.basename(sys.argv[0]) + ': success\n')

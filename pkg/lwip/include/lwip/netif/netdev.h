@@ -1,0 +1,78 @@
+/*
+ * SPDX-FileCopyrightText: 2015 Martine Lenders <mlenders@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+#pragma once
+
+/**
+ * @defgroup    pkg_lwip_netdev    lwIP netdev adapter
+ * @ingroup     pkg_lwip
+ * @brief       netdev adapter for lwIP
+ * @{
+ *
+ * @file
+ * @brief   lwIP netdev adapter definitions
+ *
+ * @author  Martine Lenders <mlenders@inf.fu-berlin.de>
+ */
+
+#include "net/ethernet.h"
+#include "net/netdev.h"
+
+#include "lwip/err.h"
+#include "lwip/netif.h"
+#include "lwip/tcpip.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief   Length of the temporary copying buffer for receival.
+ *
+ * @note    It should be as long as the maximum packet length of all the netdev
+ *          you use.
+ */
+#ifndef LWIP_NETDEV_BUFLEN
+#  define LWIP_NETDEV_BUFLEN        (ETHERNET_MAX_LEN)
+#endif
+
+/**
+ * @brief   Name of the netdev adapter thread.
+ */
+#define LWIP_NETDEV_NAME            "lwip_netdev_mux"
+
+/**
+ * @brief   Priority of the netdev adapter thread.
+ */
+#define LWIP_NETDEV_PRIO            (THREAD_PRIORITY_MAIN - 4)
+
+/**
+ * @brief   Stack size of the netdev adapter thread.
+ */
+#ifndef LWIP_NETDEV_STACKSIZE
+#  define LWIP_NETDEV_STACKSIZE     (THREAD_STACKSIZE_DEFAULT)
+#endif
+
+/**
+ * @brief   Initializes the netdev adapter.
+ *
+ * Should be passed to lwIP's netif_add() with the state parameter parameter of that function set
+ * to an existing netdev_t instance
+ *
+ * @pre netif->state is set to an existing netdev_t instance.
+ *      netif->state->context pointing to the lwip_netif_t containing this netif.
+ *
+ * @param[in] netif The network interface intended to be initialized.
+ *
+ * @return  ERR_OK on success.
+ * @return  ERR_IF on error.
+ */
+err_t lwip_netdev_init(struct netif *netif);
+
+#ifdef __cplusplus
+}
+#endif
+
+/** @} */

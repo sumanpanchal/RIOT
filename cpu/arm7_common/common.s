@@ -33,34 +33,15 @@
   .extern  sched_active_thread
   .extern  sched_context_switch_request
   .extern  sched_run
-  .extern  DEBUG_Routine
 
 /* Public functions declared in this file */
   .global  arm_irq_handler
   .global  cpu_switch_context_exit
   .global  task_return
-  .global  ctx_switch
-  .global  dINT
-  .global  eINT
+  .global  ctx_switch_from_swi
+  .global  ctx_switch_from_irq
 
-.func
-dINT:
-    mrs     r0,  cpsr
-
-    orr     r0, r0, #NOINT              /* Disable Int */
-    msr     CPSR_c, r0
-    mov     pc,lr
-.endfunc
-
-.func
-eINT:
-    mrs     r0,  cpsr
-    and     r0, r0, #~NOINT              /* Enable Int */
-    msr     CPSR_c, r0
-    mov     pc,lr
-.endfunc
-
-ctx_switch:
+ctx_switch_from_swi:
     /* Save return address on stack */
     stmfd   sp!, {lr}
 
@@ -68,7 +49,7 @@ ctx_switch:
     mov     lr, #NOINT|SVCMODE
     msr     CPSR_c, lr
 
-ctx_switch2:
+ctx_switch_from_irq:
     /* get stack pointer from user mode into lr */
     stmfd   sp, {sp}^
     sub     sp, sp, #4
@@ -121,6 +102,10 @@ task_return:
 
     /* Restore all registers, PC & cpsr */
     ldmfd   r0, {r0-lr}^
+    /* According to ARM Architecture Reference Manual DDI 0100I,
+     * ldms which affect banked registers must be followed by a nop.
+     */
+    nop
 
     /* return to task */
     movs pc, lr
@@ -144,15 +129,10 @@ arm_irq_handler:
     MRS R1, CPSR
     MSR SPSR, R1
 
-.if (CPU != mc1322x)
     /* jump into vic interrupt */
     mov    r0, #0xffffff00    /* lpc23xx */
     ldr    r0, [r0]
     add    lr,pc,#4
-.else
-    /* mc1322x seems to lack a VIC, distinction of IRQ has to be done in SW */
-    ldr    r0, =isr           /* mc1322x */
-.endif
 
     mov     pc, r0
 
@@ -181,4 +161,4 @@ switch_context_int:
     /* recover general purpose registers */
     ldmfd  sp!, {r0-r12}
 
-    b ctx_switch2
+    b ctx_switch_from_irq

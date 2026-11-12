@@ -1,16 +1,14 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014-2017 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @defgroup    core_sched Scheduler
  * @ingroup     core
  * @brief       The RIOT scheduler
- * @details
  *
  * RIOT features a tickless, preemptive, priority based scheduler.
  * Context switches can occur either preemptively (i.e. on interrupts),
@@ -20,13 +18,13 @@
  * periodically in order to emulate concurrent execution by switching
  * threads continuously.
  *
- * ## Priorities:
+ * ## Priorities
  *
  * Every thread is given a priority on creation. The priority values
  * are "order" or "nice" values, i.e. a higher value means a lower
  * priority.
  *
- * ### Example:
+ * ### Example
  *
  * Given threads with priorities A=6, B=1, and C=3, B has the highest
  * priority.
@@ -39,7 +37,7 @@
  * happens, threads with the same priority will only switch due to
  * voluntary or implicit context switches.
  *
- * ## Interrupts:
+ * ## Interrupts
  *
  * When an interrupt occurs, e.g. because a timer fired or a network
  * packet was received, the active context is saved and an interrupt
@@ -53,7 +51,7 @@
  * If the flag is not set, the original context is being restored and
  * the thread resumes immediately.
  *
- * ## Voluntary Context Switches:
+ * ## Voluntary Context Switches
  *
  * There are two function calls that can lead to a voluntary context
  * switch: `thread_yield()` and `thread_sleep()`.
@@ -62,10 +60,10 @@
  * leads to a context switch in case there is another runnable thread
  * with at least the same priority.
  *
- * ## Implicit Context Switches:
+ * ## Implicit Context Switches
  *
  * Some functions that unblock another thread, e.g. `msg_send()` or
- * `mutex_unlock()`, can cause a thread switch, if the target had a
+ * `mutex_unlock()`, can cause a thread switch, if the target has a
  * higher priority.
  *
  *
@@ -75,35 +73,136 @@
  * @brief       Scheduler API definition
  *
  * @author      Kaspar Schleiser <kaspar@schleiser.de>
+ * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef _SCHEDULER_H
-#define _SCHEDULER_H
-
 #include <stddef.h>
-#include "bitarithm.h"
-#include "tcb.h"
-#include "attributes.h"
-#include "kernel_types.h"
-#include "native_sched.h"
+#include <inttypes.h>
+
+#include "kernel_defines.h"
+#include "clist.h"
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /**
- * @def SCHED_PRIO_LEVELS
+ * @brief   The maximum number of threads to be scheduled
+ *
+ * @note    The is a compile time configuration that can be overwritten via
+ *          `CFLAGS`, as needed. RIOT may spawn system threads depending on
+ *          module selection, so there easily can be more threads spawn than
+ *          counting calls of @ref thread_create in the app's code would
+ *          suggest.
+ */
+#ifndef MAXTHREADS
+#  if defined(MODULE_CORE_THREAD) || DOXYGEN
+#    define MAXTHREADS 32
+#  else
+#    define MAXTHREADS 0
+#  endif
+#endif
+
+/**
+ * Canonical identifier for an invalid PID.
+ */
+#define KERNEL_PID_UNDEF 0
+
+/**
+ * The first valid PID (inclusive).
+ */
+#define KERNEL_PID_FIRST (KERNEL_PID_UNDEF + 1)
+
+/**
+ * The last valid PID (inclusive).
+ */
+#define KERNEL_PID_LAST (KERNEL_PID_FIRST + MAXTHREADS - 1)
+
+/**
+ * Macro for printing formatter
+ */
+#define PRIkernel_pid PRIi16
+
+/**
+ * Enables detection of stack overflows and measures stack usage when != 0
+ */
+#if defined(DEVELHELP) || defined(DOXYGEN)
+#  ifndef SCHED_TEST_STACK
+#    define SCHED_TEST_STACK 1
+#  endif  /* SCHED_TEST_STACK */
+#endif  /* DEVELHELP */
+
+/**
+ * Unique process identifier
+ */
+typedef int16_t kernel_pid_t;
+
+/**
+ * @brief   Determine if the given pid is valid
+ *
+ * @param[in]   pid     The pid to check
+ *
+ * @retval      true    the pid is valid
+ * @retval      false   pid is **NOT** valid
+ */
+static inline int pid_is_valid(kernel_pid_t pid)
+{
+    return ((KERNEL_PID_FIRST <= pid) && (pid <= KERNEL_PID_LAST));
+}
+
+/**
+ * @brief forward declaration for thread_t, defined in thread.h
+ */
+typedef struct _thread thread_t;
+
+/**
+ * @name    Thread states supported by RIOT
+ *
+ * @note    Keep in sync with OpenOCD src/rtos/riot.c
+ * @{
+ */
+typedef enum {
+    STATUS_STOPPED,                 /**< has terminated                           */
+    STATUS_ZOMBIE,                  /**< has terminated & keeps thread's thread_t */
+    STATUS_SLEEPING,                /**< sleeping                                 */
+    STATUS_MUTEX_BLOCKED,           /**< waiting for a locked mutex               */
+    STATUS_RECEIVE_BLOCKED,         /**< waiting for a message                    */
+    STATUS_SEND_BLOCKED,            /**< waiting for message to be delivered      */
+    STATUS_REPLY_BLOCKED,           /**< waiting for a message response           */
+    STATUS_FLAG_BLOCKED_ANY,        /**< waiting for any flag from flag_mask      */
+    STATUS_FLAG_BLOCKED_ALL,        /**< waiting for all flags in flag_mask       */
+    STATUS_MBOX_BLOCKED,            /**< waiting for get/put on mbox              */
+    STATUS_COND_BLOCKED,            /**< waiting for a condition variable         */
+    STATUS_RUNNING,                 /**< currently running                        */
+    STATUS_PENDING,                 /**< waiting to be scheduled to run           */
+    STATUS_NUMOF                    /**< number of supported thread states        */
+} thread_status_t;
+/** @} */
+
+/**
+ * @name Helpers to work with thread states
+ * @{
+ */
+#define STATUS_ON_RUNQUEUE      STATUS_RUNNING  /**< to check if on run queue:
+                                                   `st >= STATUS_ON_RUNQUEUE`   */
+#define STATUS_NOT_FOUND ((thread_status_t)~0)  /**< Describes an illegal thread status */
+/** @} */
+
+/**
  * @brief The number of thread priority levels
  */
 #ifndef SCHED_PRIO_LEVELS
-#define SCHED_PRIO_LEVELS 16
+#  define SCHED_PRIO_LEVELS 16
 #endif
 
 /**
  * @brief   Triggers the scheduler to schedule the next thread
- * @returns 1 if sched_active_thread/sched_active_pid was changed, 0 otherwise.
+ *
+ * @return      The new thread to schedule if sched_active_thread/sched_active_pid
+ *              was changed,
+ * @retval      NULL        If the active thread was not changed.
  */
-int sched_run(void);
+thread_t *sched_run(void);
 
 /**
  * @brief   Set the status of the specified process
@@ -112,17 +211,17 @@ int sched_run(void);
  *                          targeted process
  * @param[in]   status      The new status of this thread
  */
-void sched_set_status(tcb_t *process, unsigned int status);
+void sched_set_status(thread_t *process, thread_status_t status);
 
 /**
- * @brief       Yield if approriate.
+ * @brief       Yield if appropriate.
  *
- * @details     Either yield if other_prio is higher than the current priority,
- *              or if the current thread is not on the runqueue.
+ * Either yield if other_prio is higher than the current priority, or if the
+ * current thread is not on the runqueue.
  *
- *              Depending on whether the current execution is in an ISR (inISR()),
- *              thread_yield_higher() is called or @ref sched_context_switch_request is set,
- *              respectively.
+ * Depending on whether the current execution is in an ISR (`irq_is_in()`),
+ * `thread_yield_higher()` is called or @ref sched_context_switch_request is
+ * set, respectively.
  *
  * @param[in]   other_prio      The priority of the target thread.
  */
@@ -140,58 +239,161 @@ NORETURN void cpu_switch_context_exit(void);
 extern volatile unsigned int sched_context_switch_request;
 
 /**
- *  Thread table
+ * Thread table
  */
-extern volatile tcb_t *sched_threads[KERNEL_PID_LAST + 1];
+extern volatile thread_t *sched_threads[KERNEL_PID_LAST + 1];
 
 /**
- *  Currently active thread
- */
-extern volatile tcb_t *sched_active_thread;
-
-/**
- *  Number of running (non-terminated) threads
+ * Number of running (non-terminated) threads
  */
 extern volatile int sched_num_threads;
 
 /**
- *  Process ID of active thread
- */
-extern volatile kernel_pid_t sched_active_pid;
-
-/**
  * List of runqueues per priority level
  */
-extern clist_node_t *sched_runqueues[SCHED_PRIO_LEVELS];
+extern clist_node_t sched_runqueues[SCHED_PRIO_LEVELS];
 
-#if SCHEDSTATISTICS
 /**
- *  Scheduler statistics
+ * @brief  Removes thread from scheduler and set status to #STATUS_STOPPED
  */
-typedef struct {
-    unsigned int laststart;         /**< Time stamp of the last time this thread was
-                                         scheduled to run */
-    unsigned int schedules;         /**< How often the thread was scheduled to run */
-    unsigned long runtime_ticks;    /**< The total runtime of this thread in ticks */
-} schedstat;
+NORETURN void sched_task_exit(void);
 
 /**
- *  Thread statistics table
- */
-extern schedstat sched_pidlist[KERNEL_PID_LAST + 1];
-
-/**
- *  @brief  Register a callback that will be called on every scheduler run
+ * @brief   Change the priority of the given thread
  *
- *  @param[in] callback The callback functions the will be called
+ * @note    This functions expects interrupts to be disabled when called!
+ *
+ * @pre     (thread != NULL)
+ * @pre     (priority < SCHED_PRIO_LEVELS)
+ *
+ * @param[in,out] thread    target thread
+ * @param[in]     priority  new priority to assign to @p thread
  */
-void sched_register_cb(void (*callback)(uint32_t, uint32_t));
+void sched_change_priority(thread_t *thread, uint8_t priority);
 
+/**
+ * @brief  Set CPU to idle mode (CPU dependent)
+ *
+ * Only used when there's no idle thread.
+ *
+ * This function will be called by the scheduler when there's no runnable thread.
+ * It will be called from ISR context, and *must* allow other ISR handlers to be run.
+ * E.g., on Cortex-M, the PendSV priority is temporarily lowered (set to higher
+ * value) in order to enable other exceptions to be run.
+ *
+ * This function should also invoke setting a low power mode, e.g., by calling
+ * 'pm_set_lowest()'.
+ */
+void sched_arch_idle(void);
+
+#if IS_USED(MODULE_SCHED_CB) || defined(DOXYGEN)
+/**
+ * @brief   Scheduler run callback
+ *
+ * @note    Both @p active and @p next can be KERNEL_PID_UNDEF, but not at the
+ *          same time.
+ *
+ * @param   active      Pid of the active thread pid
+ * @param   next        Pid of the next scheduled thread
+ */
+typedef void (*sched_callback_t)(kernel_pid_t active, kernel_pid_t next);
+
+/**
+ * @brief  Register a callback that will be called on every scheduler run
+ *
+ * @param[in] callback The callback functions that will be called
+ */
+void sched_register_cb(sched_callback_t callback);
+#endif /* MODULE_SCHED_CB */
+
+/**
+ * @brief   Advance a runqueue
+ *
+ *  Advances the runqueue of that priority by one step to the next thread in
+ *  that priority.
+ *  Next time that priority is scheduled the now first thread will get activated.
+ *  Calling this will not start the scheduler.
+ *
+ * @warning This API is not intended for out of tree users.
+ *          Breaking API changes will be done without notice and
+ *          without deprecation. Consider yourself warned!
+ *
+ * @param[in]   prio    The priority of the runqueue to advance
+ *
+ */
+static inline void sched_runq_advance(uint8_t prio)
+{
+    clist_lpoprpush(&sched_runqueues[prio]);
+}
+
+#if (IS_USED(MODULE_SCHED_RUNQ_CALLBACK)) || defined(DOXYGEN)
+/**
+ * @brief   Scheduler runqueue (change) callback
+ *
+ * Function has to be provided by the user of this API. It will be called:
+ * - when the scheduler is run,
+ * - when a thread enters the active queue or
+ * - when the last thread leaves a queue
+ *
+ * @warning This API is not intended for out of tree users.
+ *          Breaking API changes will be done without notice and
+ *          without deprecation. Consider yourself warned!
+ *
+ * @param[in]   prio    the priority of the runqueue that changed
+ *
+ */
+extern void sched_runq_callback(uint8_t prio);
 #endif
+
+/**
+ * @brief   Tell if the number of threads in a runqueue is 0
+ *
+ * @param[in]   prio      The priority of the runqueue to get information of
+ * @return      Truth value for that information
+ * @warning     This API is not intended for out of tree users.
+ */
+static inline int sched_runq_is_empty(uint8_t prio)
+{
+    return clist_is_empty(&sched_runqueues[prio]);
+}
+
+/**
+ * @brief   Tell if the number of threads in a runqueue is 1
+ *
+ * @param[in]   prio      The priority of the runqueue to get information of
+ * @return      Truth value for that information
+ * @warning     This API is not intended for out of tree users.
+ */
+static inline int sched_runq_exactly_one(uint8_t prio)
+{
+    return clist_exactly_one(&sched_runqueues[prio]);
+}
+
+/**
+ * @brief   Tell if the number of threads in a runqueue greater than 1
+ *
+ * @param[in]   prio      The priority of the runqueue to get information of
+ * @return      Truth value for that information
+ * @warning     This API is not intended for out of tree users.
+ */
+static inline int sched_runq_more_than_one(uint8_t prio)
+{
+    return clist_more_than_one(&sched_runqueues[prio]);
+}
+
+/**
+ * @brief   Alias for `thread_yield` provided for compatibility with POSIX's
+ *          sched.h
+ *
+ * @see     https://pubs.opengroup.org/onlinepubs/009604299/basedefs/sched.h.html
+ *
+ * @note    Please use `thread_yield()` directly within RIOT. This is only
+ *          provided to get external code compiling.
+ */
+int sched_yield(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _SCHEDULER_H
 /** @} */

@@ -1,22 +1,19 @@
 /*
- * Copyright (C) 2015 Martine Lenders <mlenders@inf.fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2015 Martine Lenders <mlenders@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @addtogroup  unittests
  * @{
  *
  * @file
- * @brief       Unittests for the ``ng_ipv6_addr`` module
+ * @brief       Unittests for the ``ipv6_addr`` module
  *
  * @author      Martine Lenders <mlenders@inf.fu-berlin.de>
  */
-#ifndef TESTS_IPV6_ADDR_H_
-#define TESTS_IPV6_ADDR_H_
 
 #include "embUnit.h"
 
@@ -33,5 +30,4 @@ void tests_ipv6_addr(void);
 }
 #endif
 
-#endif /* TESTS_IPV6_ADDR_H_ */
 /** @} */

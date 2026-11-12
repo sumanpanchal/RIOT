@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2022 Otto-von-Guericke-Universität Magdeburg
+# SPDX-FileCopyrightText: 2022 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_NETDEV
+
+config NETDEV_REGISTER_SIGNAL
+    bool "Signal when a network device is registered"
+
+endif # USEMODULE_NETDEV

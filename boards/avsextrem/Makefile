@@ -1,5 +1,3 @@
-MODULE =$(BOARD)_base
-
-DIRS = drivers $(RIOTBOARD)/msba2-common
+MODULE = board
 
 include $(RIOTBASE)/Makefile.base

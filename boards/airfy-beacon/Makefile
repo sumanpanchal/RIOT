@@ -1,4 +1,4 @@
-# tell the Makefile.base which module to build
-MODULE = $(BOARD)_base
+MODULE = board
+DIRS = $(RIOTBOARD)/common/nrf51
 
 include $(RIOTBASE)/Makefile.base

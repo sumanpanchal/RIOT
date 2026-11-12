@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2022 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+if USEMODULE_PSA_SECURE_ELEMENT
+
+config PSA_MAX_SE_COUNT
+    int
+    prompt "Maximum number of secure elements" if USEMODULE_PSA_SECURE_ELEMENT_MULTIPLE
+    range 2 255 if USEMODULE_PSA_SECURE_ELEMENT_MULTIPLE
+    range 1 255
+
+endif # USEMODULE_PSA_SECURE_ELEMENT

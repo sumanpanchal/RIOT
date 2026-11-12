@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2021 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "Light Control object"
+
+config LWM2M_LIGHT_INSTANCES_MAX
+    int "Maximum number of Light Control object instances"
+    default 3
+
+config LWM2M_LIGHT_CONTROL_COLOR_MAX_SIZE
+    int "Maximum size of a Light Control color string"
+    default 16
+
+config LWM2M_LIGHT_CONTROL_APP_TYPE_MAX_SIZE
+    int "Maximum size of a Light Control application type string"
+    default 16
+
+endmenu # Light Control object

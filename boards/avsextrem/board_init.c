@@ -1,12 +1,7 @@
 /*
- * board_init.c - initialization of the AVSEXTREM-BOARD.
- * Copyright (C) 2013 Heiko Will <hwill@inf.fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2013 Heiko Will <hwill@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
-
 
 /**
  * @file
@@ -21,70 +16,11 @@
  *
  * @note        $Id: board_init.c 1071 2013-09-19 16:50:56 kasmi $
  */
-#include "lpc23xx.h"
 #include "cpu.h"
 
-#define PCRTC         BIT9
-#define CL_CPU_DIV    4
-
-
 /*---------------------------------------------------------------------------*/
-static inline void
-pllfeed(void)
+void board_init(void)
 {
-    PLLFEED = 0xAA;
-    PLLFEED = 0x55;
-}
-
-/*---------------------------------------------------------------------------*/
-void init_clks1(void)
-{
-    // Disconnect PLL
-    PLLCON &= ~0x0002;
-    pllfeed();
-
-    while (PLLSTAT & BIT25);  /* wait until PLL is disconnected before
-                               * disabling - deadlock otherwise */
-
-    // Disable PLL
-    PLLCON &= ~0x0001;
-    pllfeed();
-
-    while (PLLSTAT & BIT24); // wait until PLL is disabled
-
-    SCS |= 0x10;    // main OSC between 15MHz and 24MHz (more stable in tests)
-    SCS |= 0x20;     // Enable main OSC
-
-    while (!(SCS & 0x40));   // Wait until main OSC is usable
-
-    /* select main OSC, 16MHz, as the PLL clock source */
-    CLKSRCSEL = 0x0001;
-
-    // Setting Multiplier and Divider values
-    PLLCFG = 0x0008;          // M=9 N=1 Fcco = 288 MHz
-    pllfeed();
-
-    // Enabling the PLL */
-    PLLCON = 0x0001;
-    pllfeed();
-
-    /* Set clock divider to 4 (value+1) */
-    CCLKCFG = CL_CPU_DIV - 1; // Fcpu = 72 MHz
-
-#if USE_USB
-    USBCLKCFG = USBCLKDivValue; /* usbclk = 288 MHz/6 = 48 MHz */
-#endif
-}
-
-/*---------------------------------------------------------------------------*/
-void bl_init_ports(void)
-{
-    SCS |= BIT0;              // Set IO Ports to fast switching mode
-
-    /* UART0 */
-    PINSEL0 |= BIT4 + BIT6;   // RxD0 and TxD0
-    PINSEL0 &= ~(BIT5 + BIT7);
-
     //PTTU:
 
     /*Turn Board on*/
@@ -190,9 +126,8 @@ void bl_init_ports(void)
     PINSEL3 &= ~(BIT12 | BIT13 | BIT18 | BIT19);
 
     //SD
-    FIO0DIR &= ~(BIT19 | BIT20 | BIT21 | BIT22) ; //0.19 0.20 0.21 0.22 as input
+    FIO0DIR &= ~(BIT19 | BIT20 | BIT21 | BIT22); //0.19 0.20 0.21 0.22 as input
     PINMODE1 |= (BIT7) | (BIT9) | (BIT11) | (BIT13); // no resistors
     FIO2DIR &= ~(BIT11 + BIT12 + BIT13); //2.11 2.12 2.13 as input
     PINMODE4 |= (BIT23) | (BIT25) | (BIT27); // no resistors
-
 }

@@ -1,58 +1,56 @@
+/*
+ * SPDX-FileCopyrightText: 2013 Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
+ * SPDX-FileCopyrightText: 2015 Kaspar Schleiser <kaspar@schleiser.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
 /**
- * Copyright (C) 2013 Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
- *               2015 Kaspar Schleiser <kaspar@schleiser.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
- *
- * @ingroup hwtimer
- * @ingroup native_cpu
- * @{
- * @author  Ludwig Ortmann <ludwig.ortmann@fu-berlin.de>
- * @author  Kaspar Schleiser <kaspar@schleiser.de>
  * @file
- * @brief Native CPU periph/timer.h implementation
+ * @ingroup cpu_native
+ * @ingroup drivers_periph_timer
+ * @brief   Native CPU periph/timer.h implementation
+ * @author  Ludwig Knüpfer <ludwig.knuepfer@fu-berlin.de>
+ * @author  Kaspar Schleiser <kaspar@schleiser.de>
+ * @{
  *
  * Uses POSIX realtime clock and POSIX itimer to mimic hardware.
+ * This is done with the timer_settime(3), timer_create(3)  interfaces, which are
+ * sometimes found only in the -lrt library, and not in glibc.
  *
- * This is based on native's hwtimer implementation by Ludwig Ortmann.
- * I removed the multiplexing, as wtimer does the same. (kaspar)
+ * This is based on native's hwtimer implementation by Ludwig Knüpfer.
+ * I removed the multiplexing, as ztimer does the same. (kaspar)
  *
  * @}
  */
 
-#ifdef __MACH__
-#include <mach/clock.h>
-#include <mach/mach_init.h>
-#include <mach/mach_port.h>
-#endif
-
-#include <time.h>
-#include <sys/time.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "cpu.h"
 #include "cpu_conf.h"
 #include "native_internal.h"
+#include "panic.h"
 #include "periph/timer.h"
+#include "time_units.h"
 
-#define ENABLE_DEBUG (0)
+#define ENABLE_DEBUG 0
 #include "debug.h"
 
 #define NATIVE_TIMER_SPEED 1000000
 
-#define NATIVE_TIMER_MIN_RES 200
-
 static unsigned long time_null;
+static bool timer_is_running;
 
-static void (*_callback)(int);
+static timer_cb_t _callback;
+static void *_cb_arg;
 
-static struct itimerval itv;
+static struct itimerspec its;
+
+static timer_t itimer_monotonic;
 
 /**
  * returns ticks for give timespec
@@ -60,7 +58,7 @@ static struct itimerval itv;
 static unsigned long ts2ticks(struct timespec *tp)
 {
     /* TODO: check for overflow */
-    return((tp->tv_sec * NATIVE_TIMER_SPEED) + (tp->tv_nsec / 1000));
+    return (((unsigned long)tp->tv_sec * NATIVE_TIMER_SPEED) + (tp->tv_nsec / 1000));
 }
 
 /**
@@ -72,14 +70,38 @@ void native_isr_timer(void)
 {
     DEBUG("%s\n", __func__);
 
-    _callback(0);
+    _callback(_cb_arg, 0);
 }
 
-int timer_init(tim_t dev, unsigned int ticks_per_us, void (*callback)(int))
+uword_t timer_query_freqs_numof(tim_t dev)
 {
-    (void)ticks_per_us;
+    (void)dev;
+
+    assert(TIMER_DEV(dev) < TIMER_NUMOF);
+
+    return 1;
+}
+
+uint32_t timer_query_freqs(tim_t dev, uword_t index)
+{
+    (void)dev;
+
+    assert(TIMER_DEV(dev) < TIMER_NUMOF);
+
+    if (index > 0) {
+        return 0;
+    }
+
+    return NATIVE_TIMER_SPEED;
+}
+
+int timer_init(tim_t dev, uint32_t freq, timer_cb_t cb, void *arg)
+{
     DEBUG("%s\n", __func__);
     if (dev >= TIMER_NUMOF) {
+        return -1;
+    }
+    if (freq != NATIVE_TIMER_SPEED) {
         return -1;
     }
 
@@ -87,14 +109,26 @@ int timer_init(tim_t dev, unsigned int ticks_per_us, void (*callback)(int))
     time_null = 0;
     time_null = timer_read(0);
 
-    timer_irq_disable(dev);
-    _callback = callback;
-    timer_irq_enable(dev);
+    _callback = cb;
+    _cb_arg = arg;
+
+    if (timer_create(CLOCK_MONOTONIC, NULL, &itimer_monotonic) != 0) {
+        DEBUG_PUTS("Failed to create a monotonic itimer");
+        return -1;
+    }
+
+    if (native_register_interrupt(SIGALRM, native_isr_timer) != 0) {
+        DEBUG_PUTS("Failed to register SIGALRM handler");
+        timer_delete(itimer_monotonic);
+        return -1;
+    }
+
+    timer_is_running = true;
 
     return 0;
 }
 
-static void do_timer_set(unsigned int offset)
+static void do_timer_set(unsigned int offset, bool periodic)
 {
     DEBUG("%s\n", __func__);
 
@@ -102,102 +136,98 @@ static void do_timer_set(unsigned int offset)
         offset = NATIVE_TIMER_MIN_RES;
     }
 
-    memset(&itv, 0, sizeof(itv));
-    itv.it_value.tv_sec = (offset / 1000000);
-    itv.it_value.tv_usec = offset % 1000000;
-
-    DEBUG("timer_set(): setting %u.%06u\n", (unsigned)itv.it_value.tv_sec, (unsigned)itv.it_value.tv_usec);
-
-    _native_syscall_enter();
-    if (real_setitimer(ITIMER_REAL, &itv, NULL) == -1) {
-        err(EXIT_FAILURE, "timer_arm: setitimer");
+    memset(&its, 0, sizeof(its));
+    its.it_value.tv_sec = offset / NATIVE_TIMER_SPEED;
+    its.it_value.tv_nsec = (offset % NATIVE_TIMER_SPEED) * (NS_PER_SEC / NATIVE_TIMER_SPEED);
+    if (periodic) {
+        its.it_interval = its.it_value;
     }
-    _native_syscall_leave();
+
+    DEBUG("timer_set(): setting %lu.%09lu\n", (unsigned long)its.it_value.tv_sec,
+          (unsigned long)its.it_value.tv_nsec);
 }
 
 int timer_set(tim_t dev, int channel, unsigned int offset)
 {
-    (void)dev;
-    (void)channel;
     DEBUG("%s\n", __func__);
+
+    if (channel != 0) {
+        return -1;
+    }
 
     if (!offset) {
         offset = NATIVE_TIMER_MIN_RES;
     }
 
-    do_timer_set(offset);
+    do_timer_set(offset, false);
 
-    return 1;
+    if (timer_is_running) {
+        timer_start(dev);
+    }
+
+    return 0;
 }
 
 int timer_set_absolute(tim_t dev, int channel, unsigned int value)
 {
-    uint32_t now = timer_read(dev);
-    int64_t target = (int32_t)(value - now);
+    unsigned int now = timer_read(dev);
+    return timer_set(dev, channel, value - now);
+}
 
-    DEBUG("timer_set_absolute(): delta=%lli\n", target);
-    if (target < 0 && target > -NATIVE_TIMER_MIN_RES) {
-        DEBUG("timer_set_absolute(): preventing underflow.\n");
-        target = NATIVE_TIMER_MIN_RES;
+int timer_set_periodic(tim_t dev, int channel, unsigned int value, uint8_t flags)
+{
+    if (channel != 0) {
+        return -1;
     }
 
-    timer_set(dev, channel, target);
+    do_timer_set(value, true);
 
-    return 1;
+    if (!(flags & TIM_FLAG_SET_STOPPED)) {
+        timer_start(dev);
+    }
+
+    return 0;
 }
 
 int timer_clear(tim_t dev, int channel)
 {
-    (void)dev;
     (void)channel;
 
-    do_timer_set(0);
+    do_timer_set(0, false);
+    timer_start(dev);
 
-    return 1;
-}
-
-void timer_irq_enable(tim_t dev)
-{
-    (void)dev;
-    DEBUG("%s\n", __func__);
-
-    if (register_interrupt(SIGALRM, native_isr_timer) != 0) {
-        DEBUG("darn!\n\n");
-    }
-
-    return;
-}
-
-void timer_irq_disable(tim_t dev)
-{
-    (void)dev;
-    DEBUG("%s\n", __func__);
-
-    if (unregister_interrupt(SIGALRM) != 0) {
-        DEBUG("darn!\n\n");
-    }
-
-    return;
+    return 0;
 }
 
 void timer_start(tim_t dev)
 {
     (void)dev;
     DEBUG("%s\n", __func__);
+
+    timer_is_running = true;
+
+    _native_syscall_enter();
+    if (timer_settime(itimer_monotonic, 0, &its, NULL) == -1) {
+        core_panic(PANIC_GENERAL_ERROR, "Failed to set monotonic timer");
+    }
+    _native_syscall_leave();
 }
 
 void timer_stop(tim_t dev)
 {
     (void)dev;
     DEBUG("%s\n", __func__);
-}
 
+    timer_is_running = false;
 
-void timer_reset(tim_t dev)
-{
-    if (dev < TIMER_NUMOF) {
-        time_null = timer_read(dev);
+    _native_syscall_enter();
+    struct itimerspec zero = {0};
+    if (timer_settime(itimer_monotonic, 0, &zero, &its) == -1) {
+        core_panic(PANIC_GENERAL_ERROR, "Failed to set monotonic timer");
     }
+    _native_syscall_leave();
+
+    DEBUG("time left: %lu.%09lu\n", (unsigned long)its.it_value.tv_sec, its.it_value.tv_nsec);
 }
 
 unsigned int timer_read(tim_t dev)
@@ -211,21 +241,11 @@ unsigned int timer_read(tim_t dev)
     DEBUG("timer_read()\n");
 
     _native_syscall_enter();
-#ifdef __MACH__
-    clock_serv_t cclock;
-    mach_timespec_t mts;
-    host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock);
-    clock_get_time(cclock, &mts);
-    mach_port_deallocate(mach_task_self(), cclock);
-    t.tv_sec = mts.tv_sec;
-    t.tv_nsec = mts.tv_nsec;
-#else
 
-    if (real_clock_gettime(CLOCK_MONOTONIC, &t) == -1) {
-        err(EXIT_FAILURE, "timer_read: clock_gettime");
+    if (clock_gettime(CLOCK_MONOTONIC, &t) == -1) {
+        core_panic(PANIC_GENERAL_ERROR, "Failed to read monotonic clock");
     }
 
-#endif
     _native_syscall_leave();
 
     return ts2ticks(&t) - time_null;

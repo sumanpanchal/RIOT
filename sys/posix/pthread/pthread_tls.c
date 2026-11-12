@@ -1,9 +1,6 @@
 /*
- * Copyright (C) 2014 Hamburg University of Applied Sciences (HAW)
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 HAW Hamburg
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /**
@@ -16,11 +13,13 @@
  * @}
  */
 
-#include <malloc.h>
-
 #include "pthread.h"
 
-#define ENABLE_DEBUG (0)
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
+#define ENABLE_DEBUG 0
 #include "debug.h"
 
 typedef struct __pthread_tls_datum {
@@ -36,7 +35,7 @@ struct __pthread_tls_key {
 /**
  * @brief   Used while manipulating the TLS of a pthread.
  */
-static struct mutex_t tls_mutex;
+static mutex_t tls_mutex;
 
 /**
  * @brief        Find a thread-specific datum.
@@ -180,7 +179,7 @@ void __pthread_keys_exit(int self_id)
 {
     tls_data_t **tls = __pthread_get_tls_head(self_id);
 
-    /* Calling the dtor could cause another pthread_exit(), so we dehead and free defore calling it. */
+    /* Calling the dtor could cause another pthread_exit(), so we dehead and free before calling it. */
     mutex_lock(&tls_mutex);
     for (tls_data_t *specific; (specific = *tls); ) {
         *tls = specific->next;

@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2019 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "tinydtls"
+    depends on USEPKG_TINYDTLS
+
+config DTLS_PSK
+    bool "TLS_PSK_WITH_AES_128_CCM_8"
+
+config DTLS_ECC
+    bool "TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8"
+
+config DTLS_DEBUG
+    bool "Enable debug log"
+    help
+        Enable debug log output for tinydtls
+
+config DTLS_CONTEXT_MAX
+    int "Max DTLS context"
+    default 2
+    help
+        The maximum number of DTLS context at the same time.
+
+config DTLS_PEER_MAX
+    int "Max number of peers"
+    default 2 if USEMODULE_GCOAP_DTLS
+    default 1
+    help
+        The maximum number of DTLS peers.
+
+config DTLS_HANDSHAKE_MAX
+    int "Max concurrent handshake"
+    default 1
+    help
+        The maximum number of concurrent DTLS handshakes.
+
+endmenu # tinydtls

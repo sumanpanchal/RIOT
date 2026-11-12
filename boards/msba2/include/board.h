@@ -1,15 +1,12 @@
 /*
- * Copyright (C) 2013 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2013 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
+
 /**
- * @defgroup    boards_msba2 MSB-A2
- * @ingroup     boards
- * @brief       Support for the ScatterWeb MSB-A2 board
+ * @ingroup     boards_msba2
  * @{
  *
  * @file
@@ -18,34 +15,43 @@
  * @author      unknown
  */
 
-#ifndef BOARD_H_
-#define BOARD_H_
-
-#include "msba2_common.h"
+#include "lpc23xx.h"
 #include "bitarithm.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define LED_RED_PIN (BIT25)
-#define LED_GREEN_PIN (BIT26)
+/**
+ * @name    LED pin definitions and handlers
+ * @{
+ */
+#define LED0_PIN            GPIO_PIN(2, 25)
+#define LED1_PIN            GPIO_PIN(2, 26)
 
-#define LED_GREEN_OFF (FIO3SET = LED_GREEN_PIN)
-#define LED_GREEN_ON (FIO3CLR = LED_GREEN_PIN)
-#define LED_GREEN_TOGGLE (FIO3PIN ^= LED_GREEN_PIN)
+#define LED0_MASK           (BIT25)
+#define LED1_MASK           (BIT26)
 
-#define LED_RED_OFF (FIO3SET = LED_RED_PIN)
-#define LED_RED_ON (FIO3CLR = LED_RED_PIN)
-#define LED_RED_TOGGLE (FIO3PIN ^= LED_RED_PIN)
+#define LED0_OFF            (FIO3SET  = LED0_MASK)
+#define LED0_ON             (FIO3CLR  = LED0_MASK)
+#define LED0_TOGGLE         (FIO3PIN ^= LED0_MASK)
 
-void init_clks1(void);
+#define LED1_OFF            (FIO3SET  = LED1_MASK)
+#define LED1_ON             (FIO3CLR  = LED1_MASK)
+#define LED1_TOGGLE         (FIO3PIN ^= LED1_MASK)
+/** @} */
 
-typedef uint8_t radio_packet_length_t;
+/**
+ * @name MTD configuration
+ * @{
+ */
+#ifdef MODULE_MTD_MCI
+#define MTD_0 mtd_dev_get(0)
+#endif
+/** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* BOARD_H_ */
 /** @} */

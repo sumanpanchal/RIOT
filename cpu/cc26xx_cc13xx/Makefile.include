@@ -1,0 +1,6 @@
+VARIANT = $(call uppercase_and_underscore,$(CPU_VARIANT))
+CFLAGS += -DCPU_VARIANT_$(VARIANT)
+
+LINKER_SCRIPT ?= $(RIOTCPU)/cc26xx_cc13xx/ldscripts/cc26xx_cc13xx.ld
+
+INCLUDES += -I${RIOTCPU}/cc26xx_cc13xx/include

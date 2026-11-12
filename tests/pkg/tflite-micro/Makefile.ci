@@ -1,0 +1,8 @@
+# Only build for a limited number of boards during CI as this test takes a lot
+# of resources and tends to fail a lot.
+ifeq (1,$(RIOT_CI_BUILD))
+  BOARDS_SUPPORTED=native32 native64 nrf52840dk nucleo-h753zi same54-xpro slstk3402a esp32c6-devkit
+endif
+
+# Note: as the number of boards has been artificially limited for CI, there is no
+#       BOARDS_INSUFFICIENT_MEMORY variable here that you'd usually expect.

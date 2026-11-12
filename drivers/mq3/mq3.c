@@ -1,13 +1,10 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser General
- * Public License v2.1. See the file LICENSE in the top level directory for more
- * details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 /**
- * @ingroup     driver_mq3
+ * @ingroup     drivers_mq3
  * @{
  *
  * @file
@@ -19,26 +16,30 @@
  */
 
 #include "mq3.h"
+#include "macros/math.h"
 
 #define PRECISION           ADC_RES_10BIT
-#define MIN                 (100U)              /* TODO: calibrate to useful value */
-#define FACTOR              (2.33f)             /* TODO: calibrate to useful value */
+/* TODO: calibrate to useful value */
+#define MIN                 (100U)
+/* TODO: calibrate to useful value */
+#define SHIFT               (12U)
+#define FACTOR              DIV_ROUND(233UL << SHIFT, 100)
 
-int mq3_init(mq3_t *dev, adc_t adc, int channel)
+int mq3_init(mq3_t *dev, adc_t adc_line)
 {
-    dev->adc_dev = adc;
-    dev->adc_chan = channel;
-    return adc_init(dev->adc_dev, PRECISION);
+    dev->adc_line = adc_line;
+    return adc_init(dev->adc_line);
 }
 
-int mq3_read_raw(mq3_t *dev)
+int16_t mq3_read_raw(const mq3_t *dev)
 {
-    return adc_sample(dev->adc_dev, dev->adc_chan);
+    return adc_sample(dev->adc_line, PRECISION);
 }
 
-int mq3_read(mq3_t *dev)
+int16_t mq3_read(const mq3_t *dev)
 {
-    float res = mq3_read_raw(dev);
+    uint32_t res = mq3_read_raw(dev);
     res = (res > MIN) ? res - MIN : 0;
-    return (int)(res * FACTOR);
+    /* same as `(int16_t)(res * 2.33)` */
+    return (res * FACTOR) >> SHIFT;
 }

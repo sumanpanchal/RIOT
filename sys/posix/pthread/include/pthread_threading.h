@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 René Kijewski <rene.kijewski@fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 René Kijewski <rene.kijewski@fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -14,10 +13,7 @@
  * @note    Do not include this header file directly, but pthread.h.
  */
 
-#ifndef __SYS__POSIX__PTHREAD_THREADING__H
-#define __SYS__POSIX__PTHREAD_THREADING__H
-
-#include "attributes.h"
+#include "kernel_defines.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,7 +49,6 @@ int pthread_create(pthread_t *newthread, const pthread_attr_t *attr, void *(*sta
  *               Native threads must call sched_thread_exit().
  *               A pthread must not call sched_thread_exit().
  * @param[out]   retval   Return value, supplied to a joining thread.
- * @return       This function does not return.
  */
 void pthread_exit(void *retval) NORETURN;
 
@@ -105,8 +100,6 @@ static inline int pthread_equal(pthread_t thread1, pthread_t thread2)
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

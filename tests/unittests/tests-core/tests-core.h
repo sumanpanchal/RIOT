@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Martine Lenders <mlenders@inf.fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Martine Lenders <mlenders@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @addtogroup  unittests
@@ -15,8 +14,6 @@
  *
  * @author      Martine Lenders <mlenders@inf.fu-berlin.de>
  */
-#ifndef TESTS_CORE_H_
-#define TESTS_CORE_H_
 
 #include "embUnit.h"
 
@@ -58,11 +55,18 @@ Test *tests_core_cib_tests(void);
 Test *tests_core_clist_tests(void);
 
 /**
- * @brief   Generates tests for lifo.h
+ * @brief   Generates tests for list.h
  *
  * @return  embUnit tests if successful, NULL if not.
  */
-Test *tests_core_lifo_tests(void);
+Test *tests_core_list_tests(void);
+
+/**
+ * @brief   Generates tests for mbox.h
+ *
+ * @return  embUnit tests if successful, NULL if not.
+ */
+Test *tests_core_mbox_tests(void);
 
 /**
  * @brief   Generates tests for priority_queue.h
@@ -85,9 +89,22 @@ Test *tests_core_byteorder_tests(void);
  */
 Test *tests_core_ringbuffer_tests(void);
 
+/**
+ * @brief   Generates tests for xfa.h
+ *
+ * @return  embUnit tests if successful, NULL if not.
+ */
+Test *tests_core_xfa_tests(void);
+
+/**
+ * @brief   Generates tests for macros
+ *
+ * @return  embUnit tests if successful, NULL if not.
+ */
+Test *tests_core_macros_tests(void);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* TESTS_CORE_H_ */
 /** @} */

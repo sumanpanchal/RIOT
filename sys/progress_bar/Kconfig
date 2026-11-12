@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2021 Inria
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "progress bar module"
+    depends on USEMODULE_PROGRESS_BAR
+
+config PROGRESS_BAR_LENGTH
+    int "Progress bar length"
+    default 25
+    help
+       Progress bar maximum characters length
+
+config PROGRESS_BAR_FULL_CHARACTER
+    string "Progress bar character"
+    default "█"
+    help
+        The character that will be printed when the progress bar fills up.
+
+config PROGRESS_BAR_EMPTY_CHARACTER
+    string "Progress bar empty character"
+    default " "
+    help
+         The character that will be printed when the progress bar empties.
+
+config PROGRESS_BAR_PREFIX_CHARACTER
+    string "Progress bar prefix"
+    default "|"
+    help
+        Character displayed on the left of the progress bar
+
+config PROGRESS_BAR_SUFFIX_CHARACTER
+    string "Progress bar suffix"
+    default "|"
+    help
+        Character displayed on the left of the progress bar
+
+config PROGRESS_BAR_PREFIX_MAX_LENGTH
+    int "Progress bar prefix max length"
+    default 32
+
+config PROGRESS_BAR_SUFFIX_MAX_LENGTH
+    int "Progress bar suffix max length"
+    default 32
+
+endmenu # progress bar module

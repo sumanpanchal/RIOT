@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 René Kijewski
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 René Kijewski
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @addtogroup  sys_timex
@@ -14,14 +13,9 @@
  * @brief       Utility library for `struct tm`.
  */
 
-#ifndef __SYS__TIMEX__TM__H
-#define __SYS__TIMEX__TM__H
-
 #include <time.h>
 #include <sys/time.h>
 #include <stdint.h>
-
-#include "attributes.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,7 +59,7 @@ extern const int16_t TM_MON_DAYS_ACCU[12];
  * @param[in]       year   The year. Probably should be ≥ 1582, but needs to be ≥ 1.
  * @returns         `1` if it is a leap year, `0` if it is a common year.
  */
-int tm_is_leap_year(unsigned year) CONST;
+int tm_is_leap_year(unsigned year);
 
 /**
  * @brief           Returns the congruent weekday of the Doomsday (March 0).
@@ -73,18 +67,22 @@ int tm_is_leap_year(unsigned year) CONST;
  * @param[in]       year   The year. Probably should be ≥ 1582, but needs to be ≥ 1.
  * @returns         The result `% 7` is the weekday of the Doomsday of the given year.
  */
-int tm_doomsday(int year) CONST;
+int tm_doomsday(int year);
 
 /**
  * @brief           Calculates the day of the year and the weekday of a given date.
- * @details         Illegal dates are not catched.
+ * @details         Illegal dates are not caught.
  * @param[in]       year   The year. Probably should be ≥ 1582, but needs to be ≥ 1.
  * @param[in]       mon    The month, TM_MON_JAN to TM_MON_DEC.
  * @param[in]       mday   The day in the month, 1 to 31.
  * @param[out]      wday   Returns the day of the week.
  * @param[out]      yday   Returns the day of the year (Jan 1st is 0).
  */
+#ifndef ATMEGA_INCOMPATIBLE_TIME_H
 void tm_get_wyday(int year, int mon, int mday, int *wday, int *yday);
+#else
+void tm_get_wyday(int year, int mon, int mday, int8_t *wday, int16_t *yday);
+#endif
 
 /**
  * @brief               Fills in `struct tm::tm_wday` and `struct tm::tm_yday` given a date.
@@ -101,9 +99,9 @@ void tm_fill_derived_values(struct tm *tm);
  * @param[in]       year   The year.
  * @param[in]       mon    The month.
  * @param[in]       mday   The day in the month.
- * @returns         0 iff the date is invalid.
+ * @returns         0 if the date is invalid.
  */
-int tm_is_valid_date(int year, int mon, int mday) CONST;
+int tm_is_valid_date(int year, int mon, int mday);
 
 /**
  * @brief           Shallow test if a time is valid.
@@ -111,13 +109,12 @@ int tm_is_valid_date(int year, int mon, int mday) CONST;
  * @param[in]       hour   The hour.
  * @param[in]       min    The minutes.
  * @param[in]       sec    The seconds.
- * @returns         0 iff the time is invalid.
+ * @returns         0 if the time is invalid.
  */
-int tm_is_valid_time(int hour, int min, int sec) CONST;
+int tm_is_valid_time(int hour, int min, int sec);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif
 /** @} */

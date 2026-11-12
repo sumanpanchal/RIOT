@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 2014 Philipp Rosenkranz, Daniel Jentsch
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Philipp Rosenkranz, Daniel Jentsch
+ * SPDX-FileCopyrightText: 2015 Martine Lenders <mlenders@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
 #include "tests-timex.h"
@@ -44,6 +42,28 @@ static void test_timex_from_uint64(void)
     TEST_ASSERT(time.microseconds == 1000);
 }
 
+static void test_timex_to_str(void)
+{
+    timex_t t = { 0, 0 };
+    char t_str[TIMEX_MAX_STR_LEN];
+
+    TEST_ASSERT_EQUAL_STRING("0.000000 s", timex_to_str(t, t_str));
+    t.seconds = 1;
+    TEST_ASSERT_EQUAL_STRING("1.000000 s", timex_to_str(t, t_str));
+    t.seconds = 9;
+    t.microseconds = 2640288149;
+    TEST_ASSERT_EQUAL_STRING("2649.288149 s", timex_to_str(t, t_str));
+    t.seconds = 1689940699;
+    t.microseconds = 4361;
+    TEST_ASSERT_EQUAL_STRING("1689940699.004361 s", timex_to_str(t, t_str));
+    t.seconds = 100;
+    t.microseconds = 101010;
+    TEST_ASSERT_EQUAL_STRING("100.101010 s", timex_to_str(t, t_str));
+    t.seconds = UINT32_MAX;
+    t.microseconds = 999999;        /* should be .999999 */
+    TEST_ASSERT_EQUAL_STRING("4294967295.999999 s", timex_to_str(t, t_str));
+}
+
 Test *tests_timex_tests(void)
 {
     EMB_UNIT_TESTFIXTURES(fixtures) {
@@ -51,6 +71,7 @@ Test *tests_timex_tests(void)
         new_TestFixture(test_timex_add),
         new_TestFixture(test_timex_sub),
         new_TestFixture(test_timex_from_uint64),
+        new_TestFixture(test_timex_to_str),
     };
 
     EMB_UNIT_TESTCALLER(timex_tests, NULL, NULL, fixtures);

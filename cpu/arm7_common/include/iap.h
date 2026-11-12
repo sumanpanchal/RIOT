@@ -1,13 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
-#ifndef IAP_H_
-#define IAP_H_
+#pragma once
 
 #include <stdint.h>
 
@@ -44,14 +40,14 @@ extern "C" {
 #define IAP_LOCATION    (0x7FFFFFF1)
 
 /* PLL */
-#define PLLCON_PLLE     (0x01)      ///< PLL Enable
-#define PLLCON_PLLD     (0x00)      ///< PLL Disable
-#define PLLCON_PLLC     (0x03)      ///< PLL Connect
-#define PLLSTAT_PLOCK   (0x0400)    //</ PLL Lock Status
+#define PLLCON_PLLE     (0x01)      /**< PLL Enable */
+#define PLLCON_PLLD     (0x00)      /**< PLL Disable */
+#define PLLCON_PLLC     (0x03)      /**< PLL Connect */
+#define PLLSTAT_PLOCK   (0x0400)    /**< PLL Lock Status */
 
-/*
- * @brief:  Converts 'addr' to sector number
- * @note:   Sector table (Users Manual P. 610)
+/**
+ * @brief  Converts 'addr' to sector number
+ * @note   Sector table (Users Manual P. 610)
  *
  * @param addr      Flash address
  *
@@ -62,6 +58,3 @@ uint8_t iap_get_sector(uint32_t addr);
 #ifdef __cplusplus
 }
 #endif
-
-
-#endif /*IAP_H_*/

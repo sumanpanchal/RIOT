@@ -1,42 +1,20 @@
 /*
- * Copyright (c) 2001, Adam Dunkels.
- * Copyright (c) 2009, Joakim Eriksson, Niclas Finne.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote
- *    products derived from this software without specific prior
- *    written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * SPDX-FileCopyrightText: 2001 Adam Dunkels
+ * SPDX-FileCopyrightText: 2009 Joakim Eriksson, Niclas Finne
+ * SPDX-License-Identifier: BSD-3-Clause
  *
  * This file is part of the uIP TCP/IP stack.
- *
- *
  */
 
+/* for cfmakeraw on Linux */
+#define _BSD_SOURCE 1
+#define _DEFAULT_SOURCE 1
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <time.h>
 #include <sys/types.h>
 
 #include <unistd.h>
@@ -64,10 +42,7 @@ void write_to_serial(int outfd, void *inbuf, int len);
 
 #define USAGE_STRING "usage: tapslip6 [-B baudrate] [-s siodev] [-t tundev] ipaddress netmask"
 
-char tundev[1024] = { "tap0" };
-
-int
-ssystem(const char *fmt, ...) __attribute__((__format__(__printf__, 1, 2)));
+char tundev[1024] = "tap0";
 
 int
 ssystem(const char *fmt, ...)
@@ -87,6 +62,9 @@ ssystem(const char *fmt, ...)
 #define SLIP_ESC_END 0334
 #define SLIP_ESC_ESC 0335
 
+#if __GNUC__
+__attribute__((unused))
+#endif
 static void
 print_packet(u_int8_t *p, int len)
 {
@@ -116,15 +94,14 @@ is_sensible_string(const unsigned char *s, int len)
         if (s[i] == 0 || s[i] == '\r' || s[i] == '\n' || s[i] == '\t') {
             continue;
         }
-        else if (s[i] < ' ' || '~' < s[i]) {
+
+        if (s[i] < ' ' || '~' < s[i]) {
             return 0;
         }
     }
 
     return 1;
 }
-
-
 
 /*
  * Read from serial, when we have a packet write it to tun. No output
@@ -141,7 +118,7 @@ serial_to_tun(FILE *inslip, int outfd)
     int ret;
     unsigned char c;
 
-#ifdef linux
+#ifdef __linux__
     ret = fread(&c, 1, 1, inslip);
 
     if (ret == -1 || ret == 0) {
@@ -153,12 +130,13 @@ serial_to_tun(FILE *inslip, int outfd)
 
 read_more:
 
-    if (inbufptr >= sizeof(uip.inbuf)) {
+    assert(inbufptr >= 0);
+    if ((size_t)inbufptr >= sizeof(uip.inbuf)) {
         inbufptr = 0;
     }
 
     ret = fread(&c, 1, 1, inslip);
-#ifdef linux
+#ifdef __linux__
 after_fread:
 #endif
 
@@ -168,7 +146,6 @@ after_fread:
 
     if (ret == 0) {
         clearerr(inslip);
-        return;
         fprintf(stderr, "serial_to_tun: EOF\n");
         exit(1);
     }
@@ -248,14 +225,15 @@ after_fread:
     goto read_more;
 }
 
-unsigned char slip_buf[2000];
-int slip_end, slip_begin;
-
+static unsigned char slip_buf[2000];
+static int slip_end, slip_begin;
 
 void
 slip_send(int fd, unsigned char c)
 {
-    if (slip_end >= sizeof(slip_buf)) {
+    (void)fd;
+    assert(slip_end >= 0);
+    if ((size_t)slip_end >= sizeof(slip_buf)) {
         err(1, "slip_send overflow");
     }
 
@@ -264,7 +242,7 @@ slip_send(int fd, unsigned char c)
 }
 
 int
-slip_empty()
+slip_empty(void)
 {
     return slip_end == 0;
 }
@@ -272,7 +250,7 @@ slip_empty()
 void
 slip_flushbuf(int fd)
 {
-    int n;
+    ssize_t n;
 
     if (slip_empty()) {
         return;
@@ -287,7 +265,7 @@ slip_flushbuf(int fd)
         PROGRESS("Q");		/* Outqueueis full! */
     }
     else {
-        slip_begin += n;
+        slip_begin += (int)n;
 
         if (slip_begin == slip_end) {
             slip_begin = slip_end = 0;
@@ -299,7 +277,7 @@ void
 write_to_serial(int outfd, void *inbuf, int len)
 {
     u_int8_t *p = inbuf;
-    int i, ecode;
+    int i;
 
     /*  printf("Got packet of length %d - write SLIP\n", len);*/
     /*  print_packet(p, len);*/
@@ -332,7 +310,6 @@ write_to_serial(int outfd, void *inbuf, int len)
     PROGRESS("t");
 }
 
-
 /*
  * Read from tun, write to slip.
  */
@@ -342,13 +319,14 @@ tun_to_serial(int infd, int outfd)
     struct {
         unsigned char inbuf[2000];
     } uip;
-    int size;
 
-    if ((size = read(infd, uip.inbuf, 2000)) == -1) {
+    ssize_t size = read(infd, uip.inbuf, 2000);
+
+    if (size == -1) {
         err(1, "tun_to_serial: read");
     }
 
-    write_to_serial(outfd, uip.inbuf, size);
+    write_to_serial(outfd, uip.inbuf, (int)size);
 }
 
 #ifndef BAUDRATE
@@ -417,12 +395,21 @@ int
 devopen(const char *dev, int flags)
 {
     char t[1024];
+    size_t len = strlen(dev);
+
+    if (len >= sizeof(t) - strlen("/dev/")) {
+        /* Caller expects error reporting as if open() had been called,
+         * so just provide a sensible errno. */
+        errno = EINVAL;
+        return -1;
+    }
+
     strcpy(t, "/dev/");
     strcat(t, dev);
     return open(t, flags);
 }
 
-#ifdef linux
+#ifdef __linux__
 #include <linux/if.h>
 #include <linux/if_tun.h>
 
@@ -430,9 +417,9 @@ int
 tun_alloc(char *dev)
 {
     struct ifreq ifr;
-    int fd, err;
+    int fd = open("/dev/net/tun", O_RDWR);
 
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
+    if (fd  < 0) {
         return -1;
     }
 
@@ -449,7 +436,8 @@ tun_alloc(char *dev)
         strncpy(ifr.ifr_name, dev, IFNAMSIZ);
     }
 
-    if ((err = ioctl(fd, TUNSETIFF, (void *) &ifr)) < 0) {
+    int err = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    if (err < 0) {
         close(fd);
         return err;
     }
@@ -472,7 +460,7 @@ void
 cleanup(void)
 {
     ssystem("ifconfig %s down", tundev);
-#ifndef linux
+#ifndef __linux__
     ssystem("sysctl -w net.ipv6.conf.all.forwarding=1");
 #endif
     /* ssystem("arp -d %s", ipaddr); */
@@ -495,6 +483,7 @@ static int request_mac;
 void
 sigalarm(int signo)
 {
+    (void)signo;
     got_sigalarm = 1;
     return;
 }
@@ -502,7 +491,7 @@ sigalarm(int signo)
 void
 sigalarm_reset()
 {
-#ifdef linux
+#ifdef __linux__
 #define TIMEOUT (997*1000)
 #else
 #define TIMEOUT (2451*1000)
@@ -517,7 +506,7 @@ ifconf(const char *tundev, const char *ipaddr, const char *netmask)
     struct in_addr netname;
     netname.s_addr = inet_addr(ipaddr) & inet_addr(netmask);
 
-#ifdef linux
+#ifdef __linux__
     ssystem("ifconfig %s inet `hostname` up", tundev);
 
     if (strcmp(ipaddr, "0.0.0.0") != 0) {
@@ -543,8 +532,7 @@ int
 main(int argc, char **argv)
 {
     int c;
-    int tunfd, slipfd, maxfd;
-    int ret;
+    int tunfd, slipfd;
     fd_set rset, wset;
     FILE *inslip;
     const char *siodev = NULL;
@@ -627,7 +615,6 @@ main(int argc, char **argv)
             break;
     }
 
-
     if (siodev != NULL) {
         slipfd = devopen(siodev, O_RDWR | O_NONBLOCK);
 
@@ -681,7 +668,7 @@ main(int argc, char **argv)
     ifconf(tundev, ipaddr, netmask);
 
     while (1) {
-        maxfd = 0;
+        int maxfd = 0;
         FD_ZERO(&rset);
         FD_ZERO(&wset);
 
@@ -723,7 +710,7 @@ main(int argc, char **argv)
             }
         }
 
-        ret = select(maxfd + 1, &rset, &wset, NULL, NULL);
+        int ret = select(maxfd + 1, &rset, &wset, NULL, NULL);
 
         if (ret == -1 && errno != EINTR) {
             err(1, "select");

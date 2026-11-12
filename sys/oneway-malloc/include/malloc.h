@@ -1,14 +1,13 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @defgroup    oneway_malloc Oneway malloc
- * @ingroup     sys
+ * @ingroup     sys_memory_management
  *
  * @brief       A malloc implementation without free for boards where the
  *              toolchain does not implement dynamic memory allocation.
@@ -20,15 +19,14 @@
  *
  * @note        You should prefer statically allocated memory whenever possible.
  *
+ * @see         pkg_tlsf
+ *
  * @{
  * @file
  *
  * @author      Kaspar Schleiser <kaspar@schleiser.de>
  * @author      René Kijewski <rene.kijewski@fu-berlin.de>
  */
-
-#ifndef __MALLOC_H
-#define __MALLOC_H
 
 #include <stdlib.h>
 
@@ -45,12 +43,12 @@ void *malloc(size_t size);
 
 /**
  * @brief       Allocated a new block of memory and move the existing content.
- * @details     This function allocates a new block of memory and memcpy()s the content of the ond `ptr` there.
+ * @details     This function allocates a new block of memory and memcpy()s the content of the one `ptr` there.
  *
  *              We do not know the size of the old block, so illegal reads would be likely,
  *              if it was not for the fact that the memory heap up.
  * @param[in]   ptr    Old memory block that was allocated with malloc(), calloc() or realloc().
- * @param[in]   size   Size of the new block to allocted in bytes.
+ * @param[in]   size   Size of the new block to allocated in bytes.
  * @returns     The new memory block. `NULL` if the "heap" is exhausted.
  */
 void *realloc(void *ptr, size_t size);
@@ -76,8 +74,6 @@ void free(void *ptr);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __MALLOC_H */
 
 /**
  * @}

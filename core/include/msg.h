@@ -1,24 +1,167 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @defgroup    core_msg  Messaging / IPC
  * @ingroup     core
  * @brief       Messaging API for inter process communication
  *
- * There are two ways to use the IPC Messaging system of RIOT. The default is
- * synchronous messaging. In this manner, messages are either dropped when the
- * receiver is not waiting and the message was sent non-blocking, or will be
- * delivered immediately when the receiver calls msg_receive(msg_t* m). To use
- * asynchronous messaging any thread can create its own queue by calling
- * msg_init_queue(msg_t* array, int num). Messages sent to a thread with a non
- * full message queue are never dropped * and the sending never blocks. Threads
- * with a full message queue behaves like in synchronous mode.
+ * Messages
+ * ========
+ * IPC messages consist of a sender PID, a type, and some content. The sender
+ * PID will be set by the IPC internally and is not required to be set by the
+ * user. The type helps the receiver to multiplex different message types.
+ * The content can either be provided as a 32-bit integer or a pointer.
+ *
+ * Some message types are predefined; for example, @ref
+ * GNRC_NETAPI_MSG_TYPE_RCV & co are defined. These are fixed in the sense that
+ * registering for a particular set of messages (for the above, e.g. @ref
+ * gnrc_netreg_register) will use these message types. Threads that do nothing
+ * to receive such messages can safely use the same numbers for other purposes.
+ * The predefined types use non-conflicting ranges (e.g. `0x02NN`) to avoid
+ * ruling out simultaneous use of different components in the same thread.
+ *
+ * In general, threads may consider it an error to send them a message they did
+ * not request. Best practice is to log (but otherwise ignore) unexpected
+ * messages.
+ *
+ * Blocking vs non-blocking
+ * ========================
+ * Messages can be sent and received blocking and non-blocking. Both can be
+ * used combined: A message send while blocking the sender thread can be
+ * received with the non-blocking variant and vice-versa.
+ *
+ * Blocking IPC
+ * ------------
+ * For the blocking variant use @ref msg_send() or @ref msg_receive()
+ * respectively.
+ *
+ * Additionally, one can use @ref msg_send_receive() to simultaneously block
+ * the sending thread and expect a response from the receiving thread. In this
+ * case, the receiving thread must use @ref msg_reply() to reply to the message
+ * of the sender thread.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~ {.c}
+ * #include <inttypes.h>
+ * #include <stdio.h>
+ *
+ * #include "msg.h"
+ * #include "thread.h"
+ *
+ * static kernel_pid_t rcv_pid;
+ * static char rcv_stack[THREAD_STACKSIZE_DEFAULT];
+ *
+ * static void *rcv(void *arg)
+ * {
+ *     msg_t msg_req, msg_resp;
+ *
+ *     (void)arg;
+ *     while (1) {
+ *         msg_receive(&msg_req);
+ *         msg_resp.content.value = msg_req.content.value + 1;
+ *         msg_reply(&msg_req, &msg_resp);
+ *     }
+ *     return NULL;
+ * }
+ *
+ * int main(void)
+ * {
+ *     msg_t msg_req, msg_resp;
+ *
+ *     msg_resp.content.value = 0;
+ *     rcv_pid = thread_create(rcv_stack, sizeof(rcv_stack),
+ *                             THREAD_PRIORITY_MAIN - 1, 0, rcv, NULL, "rcv");
+ *     while (1) {
+ *         msg_req.content.value = msg_resp.content.value;
+ *         msg_send_receive(&msg_req, &msg_resp, rcv_pid);
+ *         printf("Result: %" PRIu32 "\n", msg_resp.content.value);
+ *     }
+ *     return 0;
+ * }
+ * ~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Non-blocking IPC
+ * ----------------
+ * For the non-blocking variant use @ref msg_try_send() or
+ * @ref msg_try_receive() respectively. If a message is sent in synchronous
+ * mode or the message queue (see below) of the receiving thread is full
+ * messages sent this way will be dropped.
+ *
+ * You can use the example on asynchronous IPC below - but without the queue -
+ * to get an impression of how to use non-blocking IPC.
+ *
+ * Synchronous vs Asynchronous
+ * ===========================
+ * RIOT's IPC supports both synchronous and asynchronous IPC.
+ *
+ * Synchronous IPC
+ * ---------------
+ * Synchronous IPC is the default mode i.e. is active when the receiving thread
+ * has no message queue initialized. Messages that can't be delivered when
+ * sending non-blocking (because the receiver already received a message) or
+ * which are sent when the receiver is not receive-blocked will be dropped.
+ *
+ * Asynchronous IPC
+ * ----------------
+ * To use asynchronous IPC one needs to initialize a message queue using
+ * @ref msg_init_queue() (note that it **must** be of a size equal to a power of
+ * two). Messages sent to a thread with a message queue that isn't full are
+ * never dropped and the sending never blocks, even when using @ref msg_send().
+ * If the queue is full and the sending thread has a higher priority than the
+ * receiving thread the send-behavior is equivalent to synchronous mode.
+ *
+ * ~~~~~~~~~~~~~~~~~~~~~~~~ {.c}
+ * #include <inttypes.h>
+ * #include <stdio.h>
+ *
+ * #include "msg.h"
+ * #include "thread.h"
+ *
+ * #define RCV_QUEUE_SIZE  (8)
+ *
+ * static kernel_pid_t rcv_pid;
+ * static char rcv_stack[THREAD_STACKSIZE_DEFAULT + THREAD_EXTRA_STACKSIZE_PRINTF];
+ * static msg_t rcv_queue[RCV_QUEUE_SIZE];
+ *
+ * static void *rcv(void *arg)
+ * {
+ *     msg_t msg;
+ *
+ *     (void)arg;
+ *     msg_init_queue(rcv_queue, RCV_QUEUE_SIZE);
+ *     while (1) {
+ *         msg_receive(&msg);
+ *         printf("Received %" PRIu32 "\n", msg.content.value);
+ *     }
+ *     return NULL;
+ * }
+ *
+ * int main(void)
+ * {
+ *     msg_t msg;
+ *
+ *     msg.content.value = 0;
+ *     rcv_pid = thread_create(rcv_stack, sizeof(rcv_stack),
+ *                             THREAD_PRIORITY_MAIN - 1, 0, rcv, NULL, "rcv");
+ *     while (1) {
+ *         if (msg_try_send(&msg, rcv_pid) == 0) {
+ *             printf("Receiver queue full.\n");
+ *         }
+ *         msg.content.value++;
+ *     }
+ *     return 0;
+ * }
+ * ~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Timing & messages
+ * =================
+ * Timing out the reception of a message or sending messages at a certain time
+ * is out of scope for the basic IPC provided by the kernel. See the
+ * @ref sys_xtimer "xtimer" module on information for these functionalities.
  *
  * @{
  *
@@ -29,15 +172,14 @@
  * @author      Kévin Roussel <Kevin.Roussel@inria.fr>
  */
 
-#ifndef MSG_H_
-#define MSG_H_
-
 #include <stdint.h>
 #include <stdbool.h>
-#include "kernel_types.h"
+
+#include "compiler_hints.h"
+#include "sched.h"
 
 #ifdef __cplusplus
- extern "C" {
+extern "C" {
 #endif
 
 /**
@@ -48,16 +190,15 @@
  * the corresponding fields are never read by the kernel.
  *
  */
-typedef struct msg {
+typedef struct {
     kernel_pid_t sender_pid;    /**< PID of sending thread. Will be filled in
                                      by msg_send. */
-    uint16_t     type;          /**< Type field. */
+    uint16_t type;              /**< Type field. */
     union {
-        char     *ptr;          /**< Pointer content field. */
+        void *ptr;              /**< Pointer content field. */
         uint32_t value;         /**< Value content field. */
     } content;                  /**< Content of the message. */
 } msg_t;
-
 
 /**
  * @brief Send a message (blocking).
@@ -79,7 +220,6 @@ typedef struct msg {
  */
 int msg_send(msg_t *m, kernel_pid_t target_pid);
 
-
 /**
  * @brief Send a message (non-blocking).
  *
@@ -97,7 +237,6 @@ int msg_send(msg_t *m, kernel_pid_t target_pid);
  * @return -1, on error (invalid PID)
  */
 int msg_try_send(msg_t *m, kernel_pid_t target_pid);
-
 
 /**
  * @brief Send a message to the current thread.
@@ -180,10 +319,16 @@ int msg_try_receive(msg_t *m);
  * @brief Send a message, block until reply received.
  *
  * This function sends a message to *target_pid* and then blocks until target
- * has sent a reply which is then stored in *reply*.
+ * has sent a reply which is then stored in *reply*. The responding thread must
+ * use @ref msg_reply().
  *
- * @note    CAUTION! Use this function only when receiver is already waiting.
- *          If not use simple msg_send()
+ * Any incoming messages other than the reply are put into the queue (if one is
+ * configured), block the sender (if sent with @ref msg_send from a thread), or
+ * rejected (if sent with @ref msg_try_send or from an interrupt) -- just like
+ * if the thread were blocked on anything different than message reception.
+ *
+ * @pre     @p target_pid is not the PID of the current thread.
+ *
  * @param[in] m             Pointer to preallocated ``msg_t`` structure with
  *                          the message to send, must not be NULL.
  * @param[out] reply        Pointer to preallocated msg. Reply will be written
@@ -222,21 +367,70 @@ int msg_reply(msg_t *m, msg_t *reply);
 int msg_reply_int(msg_t *m, msg_t *reply);
 
 /**
+ * @brief Check how many messages are available (waiting) in the message queue
+ *        of a specific thread
+ *
+ * @param[in] pid    a PID
+ *
+ * @return  Number of messages available in queue of the thread identified by
+ *          PID @p pid
+ * @retval  0       The message queue of the thread identified by PID @p pid is
+ *                  *not* initialized or PID @p pid does not refer to a running
+ *                  thread
+ */
+unsigned msg_avail_thread(kernel_pid_t pid);
+
+/**
+ * @brief Check how many messages are available (waiting) in the message queue
+ *
+ * @pre     The caller is running in thread context
+ *
+ * @return  Number of messages available in our queue
+ * @retval  0       Caller's message queue is *not* initialized
+ */
+unsigned msg_avail(void);
+
+/**
+ * @brief   Get maximum capacity of a thread's queue length
+ *
+ * @return  Number of total messages that fit in the queue of @p pid on success
+ * @retval  0       Either the thread identified by PID @p pid does not exist or
+ *                  has no message queue initialized (yet)
+ */
+unsigned msg_queue_capacity(kernel_pid_t pid);
+
+/**
  * @brief Initialize the current thread's message queue.
+ *
+ * @pre @p num **MUST BE A POWER OF TWO!**
  *
  * @param[in] array Pointer to preallocated array of ``msg_t`` structures, must
  *                  not be NULL.
  * @param[in] num   Number of ``msg_t`` structures in array.
  *                  **MUST BE POWER OF TWO!**
  *
- * @return 0, if successful
- * @return -1, on error
+ * If array resides on the stack, the containing stack frame must never be
+ * left, not even if it is the current thread's entry function.
  */
-int msg_init_queue(msg_t *array, int num);
+ACCESS(write_only, 1, 2)
+void msg_init_queue(msg_t *array, int num);
+
+/**
+ * @brief Number of messages to be maximally printed through @ref msg_queue_print
+ */
+#ifndef CONFIG_MSG_QUEUE_PRINT_MAX
+#  define CONFIG_MSG_QUEUE_PRINT_MAX 16U
+#endif
+
+/**
+ * @brief   Prints the message queue of the current thread.
+ *
+ * @note    Prints at most CONFIG_MSG_QUEUE_PRINT_MAX messages.
+ */
+void msg_queue_print(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* MSG_H_ */
 /** @} */

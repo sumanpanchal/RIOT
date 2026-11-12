@@ -1,0 +1,106 @@
+/*
+ * SPDX-FileCopyrightText: 2017 Fundacion Inria Chile
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+/**
+ * @{
+ * @ingroup     net
+ * @file
+ * @brief       Implementation of OpenThread main functions
+ *
+ * @author      Jose Ignacio Alamos <jialamos@uc.cl>
+ * @}
+ */
+
+#include "openthread/platform/alarm-milli.h"
+#include "openthread/platform/uart.h"
+#include "ot.h"
+#include "random.h"
+#include "thread.h"
+#include "event/thread.h"
+
+#ifdef MODULE_AT86RF2XX
+#include "at86rf2xx.h"
+#include "at86rf2xx_params.h"
+#endif
+
+#ifdef MODULE_KW41ZRF
+#include "kw41zrf.h"
+#endif
+
+#ifdef MODULE_CC2538_RF
+#include "cc2538_rf.h"
+#endif
+
+#ifdef MODULE_NRF802154
+#include "nrf802154.h"
+#endif
+
+#if IS_USED(MODULE_NETDEV_IEEE802154_SUBMAC)
+#include "net/netdev/ieee802154_submac.h"
+#endif
+
+#define ENABLE_DEBUG 0
+#include "debug.h"
+
+#ifdef MODULE_AT86RF2XX     /* is mutual exclusive with above ifdef */
+#define OPENTHREAD_NETIF_NUMOF        ARRAY_SIZE(at86rf2xx_params)
+#endif
+
+#ifdef MODULE_CC2538_RF
+static netdev_ieee802154_submac_t cc2538_rf_netdev;
+#endif
+
+#ifdef MODULE_AT86RF2XX
+static at86rf2xx_bhp_ev_t at86rf2xx_bhp;
+static netdev_ieee802154_submac_t at86rf2xx_netdev;
+#endif
+
+#ifdef MODULE_KW41ZRF
+static netdev_ieee802154_submac_t kw41zrf_netdev;
+#endif
+
+#ifdef MODULE_NRF802154
+static netdev_ieee802154_submac_t nrf802154_netdev;
+#endif
+
+static uint8_t rx_buf[OPENTHREAD_NETDEV_BUFLEN];
+static uint8_t tx_buf[OPENTHREAD_NETDEV_BUFLEN];
+static char ot_thread_stack[2 * THREAD_STACKSIZE_MAIN];
+
+void openthread_bootstrap(void)
+{
+    /* setup netdev modules */
+#ifdef MODULE_AT86RF2XX
+    at86rf2xx_init_event(&at86rf2xx_bhp, &at86rf2xx_params[0], &at86rf2xx_netdev.submac.dev, EVENT_PRIO_HIGHEST);
+    netdev_register(&at86rf2xx_netdev.dev.netdev, NETDEV_AT86RF2XX, 0);
+    netdev_ieee802154_submac_init(&at86rf2xx_netdev);
+    netdev_t *netdev = &at86rf2xx_netdev.dev.netdev;
+#endif
+#ifdef MODULE_KW41ZRF
+    netdev_register(&kw41zrf_netdev.dev.netdev, NETDEV_KW41ZRF, 0);
+    netdev_ieee802154_submac_init(&kw41zrf_netdev);
+
+    kw41zrf_hal_setup(&kw41zrf_netdev.submac.dev);
+    kw41zrf_init();
+    netdev_t *netdev = &kw41zrf_netdev.dev.netdev;
+#endif
+#ifdef MODULE_CC2538_RF
+    netdev_register(&cc2538_rf_netdev.dev.netdev, NETDEV_CC2538, 0);
+    netdev_ieee802154_submac_init(&cc2538_rf_netdev);
+    cc2538_rf_hal_setup(&cc2538_rf_netdev.submac.dev);
+    cc2538_init();
+    netdev_t *netdev = &cc2538_rf_netdev.dev.netdev;
+#endif
+#ifdef MODULE_NRF802154
+    netdev_register(&nrf802154_netdev.dev.netdev, NETDEV_NRF802154, 0);
+    netdev_ieee802154_submac_init(&nrf802154_netdev);
+    nrf802154_hal_setup(&nrf802154_netdev.submac.dev);
+    nrf802154_init();
+    netdev_t *netdev = &nrf802154_netdev.dev.netdev;
+#endif
+
+    openthread_radio_init(netdev, tx_buf, rx_buf);
+    openthread_netdev_init(ot_thread_stack, sizeof(ot_thread_stack), THREAD_PRIORITY_MAIN - 5, "openthread", netdev);
+}

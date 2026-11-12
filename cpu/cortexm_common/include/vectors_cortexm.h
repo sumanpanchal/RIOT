@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2015 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2015 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup     cpu_cortexm_common
@@ -16,12 +15,11 @@
  * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
  */
 
-#ifndef VECTORS_DEFAULT_H_
-#define VECTORS_DEFAULT_H_
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "cpu_conf.h"
 
 /**
  * @brief   Use this macro to make interrupt functions overridable with the
@@ -30,9 +28,34 @@ extern "C" {
 #define WEAK_DEFAULT    __attribute__((weak,alias("dummy_handler")))
 
 /**
- * @brief   Put this macro in front of the array holding the interrupt vectors
+ * @brief   Use this macro to define the parts of the vector table
+ *
+ * The entries in the vector table are sorted in ascending order defined by the
+ * (numeric) value given for `x`. The Cortex-M base vectors are always defined
+ * with `ISR_VECTOR(0)`, so the CPU specific vector(s) **must** start from 1.
  */
-#define ISR_VECTORS     __attribute__((used,section(".vectors")))
+#define ISR_VECTOR(x)   __attribute__((used,section(".vectors." # x )))
+
+/**
+ * @brief   Number of Cortex-M non-ISR exceptions
+ *
+ * This means those that are no hardware interrupts, or the ones with a
+ * negative interrupt number.
+ */
+#define CPU_NONISR_EXCEPTIONS   (15)
+
+/**
+ * @brief   All ISR functions have this type
+ */
+typedef void (*isr_t)(void);
+
+/**
+ * @brief   Structure of Cortex-M basic vector table
+ */
+typedef struct {
+    void* _estack;                          /**< exception stack pointer */
+    isr_t vectors[CPU_NONISR_EXCEPTIONS];   /**< shared Cortex-M vectors */
+} cortexm_base_t;
 
 /**
  * @brief   This function is the default entry point after a system reset
@@ -53,7 +76,7 @@ void reset_handler_default(void);
  * and can not be masked (surprise surprise...). They can be triggered by
  * software and some peripherals. So far, they are not used in RIOT.
  */
-void nmi_default(void);
+void nmi_handler(void);
 
 /**
  * @brief   Hard fault exception handler
@@ -65,8 +88,17 @@ void nmi_default(void);
 void hard_fault_default(void);
 
 /* The following four exceptions are only present for Cortex-M3 and -M4 CPUs */
-#if defined(CPU_ARCH_CORTEX_M3) || defined(CPU_ARCH_CORTEX_M4) || \
-    defined(CPU_ARCH_CORTEX_M4F)
+#if defined(CPU_CORE_CORTEX_M3) || defined(CPU_CORE_CORTEX_M4) || \
+    defined(CPU_CORE_CORTEX_M4F) || defined(CPU_CORE_CORTEX_M7)
+
+/**
+ * @brief Default memory manager behavior callback (weak function)
+ *
+ * @retval >=0 when the memory fault has been handled,
+ * @retval < 0 otherwise.
+ */
+int mem_manage_handler(void);
+
 /**
  * @brief   Memory management exception handler
  *
@@ -114,5 +146,4 @@ void dummy_handler_default(void);
 }
 #endif
 
-#endif /* VECTORS_DEFAULT_H_ */
 /** @} */

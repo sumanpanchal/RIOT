@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2019 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "Packages"
+
+rsource "flashdb/Kconfig"
+rsource "libcoap/Kconfig"
+rsource "libfixmath/Kconfig"
+rsource "libschc/Kconfig"
+rsource "littlefs2/Kconfig"
+rsource "lvgl/Kconfig"
+rsource "mbedtls/Kconfig"
+rsource "semtech-loramac/Kconfig"
+rsource "tinydtls/Kconfig"
+rsource "tinyusb/Kconfig"
+rsource "tinyvcdiff/Kconfig"
+rsource "wakaama/Kconfig"
+
+endmenu # Packages

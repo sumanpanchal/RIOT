@@ -1,14 +1,455 @@
-# CONTRIBUTE
-This is a short version of the [Development Procedures](https://github.com/RIOT-OS/RIOT/wiki/Development-procedures).
+# Contributing to RIOT
 
-1. Check if your code follows the [coding conventions](https://github.com/RIOT-OS/RIOT/wiki/Coding-conventions). If the code does not comply these style rules, your code will not be merged.
+Thank you for your interest in contributing to RIOT! There are many ways to
+contribute, and we appreciate all of them. You can jump to the major sections
+of this document using the following links:
 
-2. The master branch should always be in a working state. The RIOT maintainers will create release tags based on this branch, whenever a milestone is completed.
+* [Getting Started][getting-started]
+* [Bug Reports and Feature Requests][issues]
+* [Contributing code][contributing-code]
+* [Writing Documentation][writing-documentation]
+* [Working with Git][working with git]
+* [Mediate Conflicts][mediate-conflicts]
+* [Extractive Contributions][extractive-contributions]
 
-3. Comments on a pull request should be added to the request itself, and *not* to the commit.
+If you have questions, please write a post over at our [forum] or chat on
+`#riot-os:matrix.org` on [Matrix].
 
-4. Keep commits to the point, e.g., don't add whitespace/typo fixes to other code changes. If changes are layered, layer the patches.
+As a reminder, all contributors are expected to follow our
+[Code of Conduct](https://guide.riot-os.org/general/code_of_conduct/).
 
-5. Describe the technical detail of the change(s) as specific as possible.
+[forum]: https://forum.riot-os.org
+[Matrix]: https://matrix.to/#/#riot-os:matrix.org
 
-6. Use [Labels](https://github.com/RIOT-OS/RIOT/wiki/Labels) to help classify pull requests and issues.
+## Getting Started
+[getting-started]: #getting-started
+If you are just beginning to work with RIOT you might first want to read our
+[guide] and [API documentation]. Especially the following sections might be of
+interest to you
+
+- [Getting Started](https://guide.riot-os.org/getting-started/installing/)
+- [Creating modules](https://guide.riot-os.org/advanced_tutorials/creating_modules/)
+- [Creating an application](https://guide.riot-os.org/advanced_tutorials/creating_application/)
+
+[guide]: https://guide.riot-os.org
+[API documentation]: https://api.riot-os.org
+
+## Bug reports and feature requests
+[issues]: #bug-reports-and-feature-requests
+Both bug reports and feature request, big or small, are welcome.
+
+Before submitting a feature request, please check if an [open issue][existing-feature-request]
+already exists. If this is not the case, [submit a feature request][feature-request].
+Describe your use case, why you need this feature and why this feature is important for RIOT.
+
+Before filing a bug report, please check if an [open issue][existing-bug]
+already exists. If this is not the case, [submit a new bug report][bug-report].
+If you're not sure if something is a bug or not, feel free to file a bug report anyway.
+
+**If you believe reporting your bug publicly represents a security risk to
+RIOT users, please send an email describing the bug to <security@riot-os.org>**.
+We would appreciate waiting for a 6 months grace period before reporting it on
+public channels, to allow us adequate time to release the fix.
+
+[bug reports]: https://github.com/RIOT-OS/RIOT/issues/new?template=bug_report.md
+[feature requests]: https://github.com/RIOT-OS/RIOT/issues/new?template=feature_request.md
+
+[existing-feature-request]: https://github.com/RIOT-OS/RIOT/issues?q=state:open+type:issue+label:"Type:+new+feature"
+[feature-request]: https://github.com/RIOT-OS/RIOT/issues/new?template=feature_request.md&title=Feature+Request:
+[existing-bug]: https://github.com/RIOT-OS/RIOT/issues?q=state:open+type:issue+label:"Type:+bug"
+[bug-report]: https://github.com/RIOT-OS/RIOT/issues/new?template=bug_report.md&title=Bug:
+
+## Contributing code
+[contributing-code]: #contributing-code
+If you think your work should be integrated in the main RIOT repository, take
+the following steps:
+
+  1. Fork the RIOT git repository (if you haven't done this already).
+  1. Create a branch for your contribution.
+  1. Make sure your code is in compliance with RIOT's [coding conventions].
+  1. Make commits. Make sure to follow RIOT's [commit conventions].
+  1. Push this branch to your fork on GitHub.
+  1. Open a [pull request][open-a-pull-request]. See [pull requests].
+  1. RIOT maintainers will set [labels] and provide feedback.
+  1. Address this feedback. See [working with git].
+  1. Your code is merged in RIOT master branch when it passes review.
+
+Be sure to read the [general tips] below.
+If you are using AI tools, please also read [our AI Policy][ai-policy].
+
+[open-an-issue]: https://github.com/RIOT-OS/RIOT/issues?q=state:open+type:issue+label:"Type:+bug"
+[labels]: https://github.com/RIOT-OS/RIOT/wiki/RIOT%27s-labeling-system
+[open-a-pull-request]: https://help.github.com/articles/using-pull-requests
+[ai-policy]: https://doc.riot-os.org/general/ai_policy
+
+### General Tips
+[general tips]: #general-tips
+From experience, the following recommendations help to get a software
+contribution into RIOT master faster:
+
+- **Ask around for help!** Either offline or through one of our communication
+  channels (see above). The earlier you check your feature design with other
+  people, the less likely it is that it is denied during the review process.
+- **Verify your concept early!** If you work on your own until the code
+  *looks* good enough to show publicly, you might miss some design flaws others
+  might have spotted earlier.
+- **Keep it simple!** Try to use what is already there and don't change existing
+  APIs if not absolutely necessary.
+- **Keep it small!** A PR with >1000 lines of changes will very likely make
+  even the most active reviewer put your review on their long to-do list.
+- **Keep it modular!** Make extensions to a feature or new features for a
+  platform optionally to use.
+- **Provide tests!** They should be comprehensible and easy to be executed.
+  Alternatively comprehensive testing procedures should be provided with your
+  pull request.
+
+### Coding conventions
+[coding conventions]: #coding-conventions
+
+RIOT has extensive [coding conventions][coding-conventions].
+It is possible to check if your code follows these conventions:
+
+* You can [uncrustify] `.c` and `.h` files:
+
+  ```shell
+  uncrustify -c $RIOTBASE/uncrustify-riot.cfg --no-backup <your file>
+  ```
+
+  **Note**: The `--no-backup` flag makes uncrustify *replace* the current file
+   with a formatted version.
+
+* RIOT provides static test tools to verify the quality of changes (cppcheck,
+  trailing whitespaces, documentation, etc). These tools are wrapped in a
+  single `make` target: `static-test`.
+
+  *Watch out:* the command below will rebase your branch on your master branch,
+  so make sure they can be rebased (e.g. there's no potential conflict).
+
+  ```shell
+  make static-test
+  ```
+
+  Use it before opening a PR to perform last time checks.
+
+[coding-conventions]: https://guide.riot-os.org/c_tutorials/coding_conventions/
+
+### Commit conventions
+[commit conventions]: #commit-conventions
+
+* Each commit should target changes of specific parts/modules of RIOT. The
+  commits use the following pattern:
+
+  ```text
+  area of code: description of changes
+  ```
+
+  You can use multi-line commit messages if you want to detail more the
+  changes.
+  For example:
+
+  ```text
+  periph/timer: Document that set_absolute is expected to wrap
+
+  Most timers are implemented this way already, and keeping (documenting)
+  it that way allows the generic timer_set implementation to stay as
+  simple as it is.
+  ```
+
+* The commit message is automatically checked by the static tests for keywords
+  that prevent a merge, for example "fixup" or "DONOTMERGE". The full list
+  of these keywords is stored in `dist/tools/pr_check/no_merge_keywords`.
+
+### Pull Requests
+[pull requests]: #pull-requests
+
+GitHub's Pull Request (PR) feature is the primary mechanism used to make
+contributions to the RIOT codebase. GitHub itself has some great documentation
+on [using the Pull Request feature][about-pull-requests].
+We use the [fork and pull model][development-models], where contributors push
+changes to their personal fork and create pull requests to bring those changes
+into the source repository.
+
+* Before opening a new Pull Request, have a look at
+  [existing ones][existing-pull-requests]. Maybe someone has already opened one
+  about the same thing. If it's the case, you might be able to help with the
+  contribution. Just comment on the PR and ask. Include closed PR's in your
+  search, as previous work might have been closed for lack of interest.
+  Old and stalled [PRs are sometimes archived][archived-pull-requests] with the
+  "State: archived" label, maybe one of them is also about the same topic.
+
+* The Pull Request title should reflect what it is about and be in the same form
+  as the [commit conventions].
+
+* Each Pull Request form uses a template that is there to help
+  maintainers understand your contribution and help them in testing it.
+  Please fill each section with as much information as possible.
+
+* We recommend that you leave the *'Allow edits from maintainers'* check box ticked.
+  This will allow maintainer finalizing your PR by pushing in your branch.
+  In general, this speeds up the PR merge in the main repository.
+  Note that this is not an obligation.
+
+* Remember that smaller PRs tend to be merged faster, so keep your changes as
+  concise as possible. They should be confined to a single explainable
+  change, and be runnable on their own. So don't hesitate to split your PRs
+  into smaller ones when possible.
+
+* Maintainers try their best to review every PR as fast as possible, but they
+  are also only human and it can happen that they miss a few PRs or might be
+  preoccupied with other PRs. If it happens that your PR receives no review for
+  a long time, don't hesitate to gently solicit a review by commenting or
+  by explicitly mentioning a maintainer that you know is knowledgeable in the
+  area of the PR. You can also advertise the PR on the [forum] and ask for a
+  review there.
+
+* Try to answer reviews as quickly as possible to speed up the review process
+  and avoid stalled PRs.
+
+[about-pull-requests]: https://help.github.com/articles/about-pull-requests/
+[development-models]: https://help.github.com/articles/creating-a-pull-request-from-a-fork
+[existing-pull-requests]: https://github.com/RIOT-OS/RIOT/pulls
+[archived-pull-requests]: https://github.com/RIOT-OS/RIOT/pulls?q=is:pr+label:"State:+archived"
+[uncrustify]: http://uncrustify.sourceforge.net
+
+## Writing Documentation
+[writing-documentation]: #writing-documentation
+
+Documentation improvements are always welcome and a good starting point for
+new contributors. This kind of contribution is merged quite quickly in general.
+
+RIOT documentation is built with [Doxygen][doxygen] and [Starlight][starlight].
+Doxygen reads files in the RIOT source code to generate
+the modules, CPUs, boards and packages API documentation.
+Starlight is used to generate the guides and tutorials.
+
+Refer to the [How to Doc guide][how-to-doc] for more information on how to write guides
+and [coding conventions documentation][coding-conventions-documentation]
+for more information on how to write code documentation.
+
+[doxygen]: http://www.doxygen.nl/
+[starlight]: https://starlight.astro.build/
+[how-to-doc]: https://guide.riot-os.org/misc/how_to_doc/
+[coding-conventions-documentation]: https://guide.riot-os.org/c_tutorials/coding_conventions/#documentation
+
+## Working with Git
+[working with git]: #working-with-git
+Using git is a bit difficult for newcomers. If you are completely new to git,
+we recommend that you [start by learning it][try-github-io] a bit. You can also
+read the official [getting started documentation][git-scm-getting-started].
+
+In this section, we give the bare minimum for a better experience with our
+development workflow on GitHub.
+
+[try-github-io]: https://try.github.io/
+[git-scm-getting-started]: https://git-scm.com/book/en/v2/Git-Basics-Getting-a-Git-Repository
+
+### Setup your local RIOT repository
+
+Before you start modifying code, you need to fork the RIOT upstream repository
+from the [RIOT main GitHub page][riot-github].
+
+If it's your first time with git, configure your name and emails:
+
+```shell
+git config --global user.name = "<your name here>"
+git config --global user.email = "<your email address here>"
+```
+
+Then clone locally your fork of RIOT (replace `account name` with your actual
+login on GitHub):
+
+```shell
+git clone git@github.com:<account name>/RIOT.git
+```
+
+You can keep any branch of your local repository up-to-date with the upstream
+master branch with the following commands:
+
+```shell
+git checkout <branch name>
+git pull --rebase https://github.com/RIOT-OS/RIOT.git
+```
+
+Use it before opening a PR. This will at least ensure the PR is mergeable but
+also that it is up-to-date with the upstream repository.
+
+[riot-github]: https://github.com/RIOT-OS/RIOT
+
+### Work on branches
+
+Avoid opening a PR from the `master` branch of your fork to the master branch of
+the RIOT upstream repository: update your master branch and start a new branch
+from it.
+
+```shell
+git checkout master
+git pull --rebase https://github.com/RIOT-OS/RIOT.git
+git checkout -b <new branch>
+```
+
+You can then do your changes, commit them and push them to your local repository
+by using the following command:
+
+```shell
+git push origin <your branch>
+```
+
+### Add fixup commits during review
+
+To keep the history of changes easier to track for reviewers, it is recommended
+to push your review request updates in fixup commits.
+
+Let's say your PR contains 3 commits with comments: `prefix1: change 1`,
+`prefix2: change 2` and `prefix3: change 3`.
+
+Instead of committing changes in `prefix2` in a 4th commit `prefix2: change 4`,
+you can use the `--fixup` option:
+
+```shell
+git add /path/of/prefix2
+git commit --fixup <prefix2 commit hash>
+```
+
+### Squash commits after review
+
+During the course of a Pull Request, a lot of `fixup!` commits can accumulate.
+To keep the project commit history clean, these commits have to be combined
+(squashed) into sensible commits. This is a good opportunity to take a look
+again at again our [commit conventions].
+
+***Note:*** The static tests will warn you about no-merge keywords such as
+`fixup` or `DONOTMERGE`. These commits have to be squashed or removed before a
+merge is permitted.
+
+***Watch out:*** Don't squash your commits unless a maintainer asks you to do it.
+
+Otherwise the history of review changes is lost and for large PRs, it
+makes it difficult for the reviewer to follow them. It might also happen that
+you introduce a regression and won't be able to recover your working state from
+previous commits.
+
+Squashing a commit is done using the `rebase` subcommand of git in interactive
+mode, you can find information on rebasing in the
+[GitHub rebase documentation][about-git-rebase].
+
+[about-git-rebase]: https://help.github.com/articles/about-git-rebase/
+
+The safest method to squash your commits is to find out the last commit hash
+of the `master` branch with `git merge-base HEAD master`.
+
+You can then execute `git rebase -i <last master hash>`, which will show you
+all the commits you have made since in a text editor. You can select, drop,
+reorder and squash the commits here.
+
+If you used [fixup commits](#add-fixup-commits-during-review) during the review
+phase, squashing commits can be performed in a single command:
+
+```shell
+git rebase -i --autosquash <last master hash>
+```
+
+If you encounter a merge conflict, it is generally easiest to use a merge tool
+like [meld](https://meldmerge.org/) or the built-in merge tool of your editor
+or IDE.
+
+After the merge conflict is resolved you can continue the rebase by using
+
+```shell
+git rebase --continue
+```
+
+Once squashing is done, you will have to force push your branch to update the
+PR:
+
+```shell
+git push origin <your branch> --force-with-lease
+```
+
+### Manually rebasing
+
+A maintainer might ask you to rebase your Pull Request for various
+reasons. Sometimes the development on the `master` branch has progressed,
+making a rebase in your Pull Request necessary to apply upstream changes.
+
+First, you have to sync your fork to the upstream `master` branch.
+You can do that by visiting your fork on https://github.com/username/RIOT.
+You will find a message such as
+`This branch is 4 commits behind RIOT-OS/RIOT:master.`. To the right of this
+message there is a `Sync Fork` button that allows you to `Update Branch`.
+
+Once the `master` branch of your fork has been updated, you can use
+`git pull master` in your console to fetch the latest changes.
+
+To perform the rebase, you have to be on your development branch, so if
+necessary checkout to your branch and run `git rebase master`.
+
+Ideally, no conflicts should arise. If that happens, take a look at the
+previous section.
+
+You then have to force push your updated branch to the remote repository by
+using the following command:
+
+```shell
+git push origin <your branch> --force-with-lease
+```
+
+## Mediating Conflicts
+[mediate-conflicts]: #mediate-conflicts
+
+A diverse community such as the RIOT community has inherently a diverse set of
+views and opinions. Occasionally those may clash, even with all parties adhering
+to our [code of conduct][code-of-conduct]. In case you seek out help to resolve
+it you may send an email to [mediator email list][email-mediator]. The email
+will be forwarded to a panel of mediators consisting of trusted RIOT
+community members including both maintainers and non-maintainers.
+
+We see the mediation as a tool to solve conflicts, not as a way to sanction
+people. Hence, do not be afraid to contact our mediators and equally do not
+feel denounced or punished if someone invokes mediation.
+
+This is a (non-exhaustive) list of reasons you can ask for mediation:
+
+- You are a contributor and feel being treated unfairly by another contributor
+  or maintainer
+    - Your PR is rejected/blocked for unjust or non-technical reasons.
+    - A PR is rejected/blocked for valid technical reasons, but without due
+      consideration of your arguments
+    - A maintainer is asking for disproportionate changes to your PR in order
+      to get it upstream, e.g. fixing issues unrelated to your PR
+- You disagree with other contributors/maintainers on how RIOT should evolve
+    - E.g. there are competing pull requests that cover highly related use
+      cases and there is a disagreement which should be preferred
+    - A pull request results (or resulted) deliberately in a regression for a
+      particular use case, e.g. by doing a different trade-off that benefits
+      another use case
+    - A feature relevant for your use case has been deprecated/removed
+      (e.g. to reduce maintenance burden, reduce (perceived) duplication of
+      features, etc.) but your use case relies on the feature or implementation
+      details of the feature
+
+Note: Violations of our [code of conduct][code-of-conduct] should be reported
+      to [email-coc]. See our [code of conduct][code-of-conduct] for more
+      details.
+
+[code-of-conduct]: https://guide.riot-os.org/general/code_of_conduct/
+[email-mediator]: mailto:mediation@riot-os.org
+[email-coc]: mailto:conduct@riot-os.org
+
+## Extractive Contributions
+[extractive-contributions]: #extractive-contributions
+
+Please be aware that we may close issues and pull requests
+that we consider as [extractive contribution][guide-extractive-contributions].
+
+[guide-extractive-contributions]: https://guides.riot-os.org/general/ai_policy/#extractive-contributions
+
+If your contribution has been closed as extractive contribution, this does not mean
+that you are not welcome to our community. If you are willing to invest time
+and to learn, we are more than happy to guide and help you. A good first step to
+show that you are willing to invest time is to follow [our guide][guide] to set
+up your development system, so that you can compile and test your contributions.
+A good second step would be to go [through our tutorials][tutorials] with little
+to no help of an LLM. We are also happy to answer your questions about the
+tutorials, if you get stuck.
+
+[tutorials]: https://github.com/riot-os/tutorials

@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 2014 Martine Lenders <mlenders@inf.fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Martine Lenders <mlenders@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
 #include <string.h>
+
+#include "container.h"
 
 #include "embUnit.h"
 
@@ -21,7 +21,7 @@ static priority_queue_node_t qe[Q_LEN];
 static void set_up(void)
 {
     priority_queue_init(&q);
-    for (unsigned i = 0; i < sizeof(qe)/sizeof(priority_queue_node_t); ++i) {
+    for (unsigned i = 0; i < ARRAY_SIZE(qe); ++i) {
         priority_queue_node_init(&(qe[i]));
     }
 }

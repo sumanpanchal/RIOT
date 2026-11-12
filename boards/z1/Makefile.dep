@@ -1,1 +1,3 @@
-USEMODULE += msp430_common
+ifneq (,$(filter netdev_default,$(USEMODULE)))
+  USEMODULE += cc2420
+endif

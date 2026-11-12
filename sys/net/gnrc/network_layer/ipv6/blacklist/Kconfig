@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2019 HAW Hamburg
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "GNRC IPv6 Blacklisting"
+    depends on USEMODULE_GNRC_IPV6_BLACKLIST
+
+config GNRC_IPV6_BLACKLIST_SIZE
+    int "Maximum size of the blacklist"
+    default 8
+
+endmenu # GNRC IPv6 Blacklisting

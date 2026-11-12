@@ -1,0 +1,48 @@
+/*
+ * SPDX-FileCopyrightText: 2020 Inria
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+#pragma once
+
+/**
+ * @ingroup     pkg_uwb_core
+ * @{
+ *
+ * @file
+ * @brief       uwb-core single-sided two-way ranging module configurations
+ *              taken from decawave-uwb-core/lib/twr_ss/syscfg.yml
+ *
+ * @author      Francisco Molina <francois-xavier.molina@inria.fr>
+ * @}
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Enable ranging services
+ */
+#ifndef MYNEWT_VAL_TWR_SS_ENABLED
+#define MYNEWT_VAL_TWR_SS_ENABLED (IS_USED(MODULE_UWB_CORE_TWR_SS))
+#endif
+
+/**
+ * @brief TOA timeout delay for SS TWR (usec)
+ */
+#ifndef MYNEWT_VAL_TWR_SS_RX_TIMEOUT
+#define MYNEWT_VAL_TWR_SS_RX_TIMEOUT (((uint16_t)0x30))
+#endif
+
+/**
+ * @brief tx holdoff delay for SS TWR (usec)
+ */
+#ifndef MYNEWT_VAL_TWR_SS_TX_HOLDOFF
+#define MYNEWT_VAL_TWR_SS_TX_HOLDOFF (((uint32_t)0x0300 + 0xA0 \
+                                     * IS_USED(MODULE_UWB_CORE_RNG_TRX_INFO)))
+#endif
+
+#ifdef __cplusplus
+}
+#endif

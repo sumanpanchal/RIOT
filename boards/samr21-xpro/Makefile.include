@@ -1,25 +1,6 @@
-# define the cpu used by SAMR21 Xplained Pro board
-export CPU = samd21
-export CPU_MODEL = samr21g18a
+# If port selection via ttys.py is enabled by `MOST_RECENT_PORT=1`, filter
+# USB serials to only select the UART bridge of the embedded EDBG CMSIS-DAP
+# debugger.
+TTY_BOARD_FILTER := --model 'EDBG CMSIS-DAP'
 
-# set default port depending on operating system
-PORT_LINUX ?= /dev/ttyACM0
-
-# setup the boards dependencies
-include $(RIOTBOARD)/$(BOARD)/Makefile.dep
-
-# setup serial terminal
-include $(RIOTBOARD)/Makefile.include.serial
-
-# Add board selector (USB serial) to OpenOCD options if specified.
-# Use /dist/tools/usb-serial/list-ttys.sh to find out serial number.
-#   Usage: SERIAL="ATML..." BOARD="samr21-xpro" make flash
-ifneq (,$(SERIAL))
-export OPENOCD_EXTRA_INIT += "-c cmsis_dap_serial $(SERIAL)"
-endif
-
-# this board uses openocd
-include $(RIOTBOARD)/Makefile.include.openocd
-
-# include cortex defaults
-include $(RIOTBOARD)/Makefile.include.cortexm_common
+include $(RIOTMAKE)/boards/sam0.inc.mk

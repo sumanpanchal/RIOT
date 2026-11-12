@@ -1,17 +1,12 @@
 /*
- * Copyright (C) 2013 Zakaria Kasmi <zkasmi@inf.fu-berlin.de>
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
- *
+ * SPDX-FileCopyrightText: 2013 Zakaria Kasmi <zkasmi@inf.fu-berlin.de>
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
 
+#pragma once
 
 /**
- * @defgroup    boards_avsextrem Avsextrem
- * @ingroup     boards
- * @brief       Support for the Avsextrem board
+ * @ingroup     boards_avsextrem
  * @{
  *
  * @file
@@ -21,41 +16,34 @@
  * @author      Zakaria Kasmi
  */
 
-
-#ifndef BOARDCONF_H_
-#define BOARDCONF_H_
+#include "lpc23xx.h"
 #include "bitarithm.h"
-#include "msba2_common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define LED_RED_PIN (BIT25)
-#define LED_GREEN_PIN (BIT26)
+/**
+ * @name    LED pin definitions and handlers
+ * @{
+ */
+#define LED0_PIN            GPIO_PIN(2, 25)
+#define LED1_PIN            GPIO_PIN(2, 26)
 
-#define LED_GREEN_OFF (FIO3SET = LED_GREEN_PIN)
-#define LED_GREEN_ON (FIO3CLR = LED_GREEN_PIN)
-#define LED_GREEN_TOGGLE (FIO3PIN ^= LED_GREEN_PIN)
+#define LED0_MASK           (BIT25)
+#define LED1_MASK           (BIT26)
 
-#define LED_RED_OFF (FIO3SET = LED_RED_PIN)
-#define LED_RED_ON (FIO3CLR = LED_RED_PIN)
-#define LED_RED_TOGGLE (FIO3PIN ^= LED_RED_PIN)
+#define LED0_OFF            (FIO3SET  = LED0_MASK)
+#define LED0_ON             (FIO3CLR  = LED0_MASK)
+#define LED0_TOGGLE         (FIO3PIN ^= LED0_MASK)
 
-#ifdef MODULE_FAT
-#define CFG_CONF_MEM_SIZE             0x7FFFFFFF
-#define SYSLOG_CONF_NUM_INTERFACES        2
-#else
-#define SYSLOG_CONF_NUM_INTERFACES        1
-#endif
-
-void init_clks1(void);
-
-typedef uint8_t radio_packet_length_t;
+#define LED1_OFF            (FIO3SET  = LED1_MASK)
+#define LED1_ON             (FIO3CLR  = LED1_MASK)
+#define LED1_TOGGLE         (FIO3PIN ^= LED1_MASK)
+/** @} */
 
 #ifdef __cplusplus
 }
 #endif
 
 /** @} */
-#endif /* BOARDCONF_H_ */

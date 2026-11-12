@@ -1,10 +1,9 @@
 /*
- * Copyright (C) 2014 Freie Universität Berlin
- *
- * This file is subject to the terms and conditions of the GNU Lesser
- * General Public License v2.1. See the file LICENSE in the top level
- * directory for more details.
+ * SPDX-FileCopyrightText: 2014 Freie Universität Berlin
+ * SPDX-License-Identifier: LGPL-2.1-only
  */
+
+#pragma once
 
 /**
  * @ingroup pthread
@@ -14,12 +13,8 @@
  * @note    Do not include this header file directly, but pthread.h.
  */
 
-#ifndef __SYS__POSIX__PTHREAD_MUTEX__H
-#define __SYS__POSIX__PTHREAD_MUTEX__H
-
 #include <time.h>
 
-#include "kernel.h"
 #include "mutex.h"
 
 #ifdef __cplusplus
@@ -45,7 +40,7 @@ int pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *mutexa
 /**
  * @brief           Destroy a mutex.
  * @details         This is currently a no-op.
- *                  Destroying a mutex locked is undefined behavior.
+ *                  Destroying a mutex locked is undefined behavior.
  * @param[in,out]   mutex   Datum to destroy.
  * @returns         0, this invocation is a no-op that cannot fail.
  */
@@ -111,8 +106,6 @@ int pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int prioceiling, int *o
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif
 
 /**

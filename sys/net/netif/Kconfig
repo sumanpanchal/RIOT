@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+# SPDX-License-Identifier: LGPL-2.1-only
+
+menu "Network Interfaces"
+    depends on USEMODULE_NETIF
+
+config NETIF_NAMELENMAX
+    int "Maximum length for an interface name"
+    default 8
+
+endmenu # Network Interfaces

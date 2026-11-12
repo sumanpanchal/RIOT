@@ -1,0 +1,52 @@
+/*
+ * SPDX-FileCopyrightText: 2020 Kaspar Schleiser <kaspar@schleiser.de>
+ * SPDX-FileCopyrightText: 2020 Freie Universität Berlin
+ * SPDX-FileCopyrightText: 2020 Inria
+ * SPDX-License-Identifier: LGPL-2.1-only
+ */
+
+/**
+ * @ingroup     sys
+ * @{
+ *
+ * @file
+ * @brief       Module creating a dummy thread
+ *
+ * This module can be used to mess up the number of threads a bit, e.g., for
+ * testing test scripts.
+ *
+ * This module can be used by manually adding it to the command line when
+ * building, e.g.,
+ *
+ *     USEMODULE+=dummy_thread make -C tests/core/rmutex
+ *     make -C tests/core/rmutex test
+ *
+ * Note how the output of the test changes compared to a build without
+ * dummy_thread.
+ *
+ * @author      Kaspar Schleiser <kaspar@schleiser.de>
+ *
+ * @}
+ */
+
+#include "thread.h"
+
+static char _dummy_stack[THREAD_STACKSIZE_IDLE];
+
+static void *_dummy_thread(void *arg)
+{
+    (void)arg;
+    while (1) {
+        thread_sleep();
+    }
+
+    return NULL;
+}
+
+void dummy_thread_create(void)
+{
+    thread_create(_dummy_stack, sizeof(_dummy_stack),
+                  THREAD_PRIORITY_IDLE,
+                  THREAD_CREATE_WOUT_YIELD | THREAD_CREATE_SLEEPING,
+                  _dummy_thread, NULL, "dummy");
+}
